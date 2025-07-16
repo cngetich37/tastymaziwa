@@ -3,13 +3,12 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Transaction, CreditSale } from '@/lib/types';
-import { getDashboardData } from '@/lib/data';
 
 interface DataContextType {
     recentActivity: Transaction[];
     creditData: CreditSale[];
-    addTransaction: (newTx: Omit<Transaction, 'id'>) => void;
-    addCreditSale: (newSale: Omit<CreditSale, 'id' | 'amountOwed' | 'status'>) => void;
+    addTransaction: (newTx: Omit<Transaction, 'id'>) => Promise<void>;
+    addCreditSale: (newSale: Omit<CreditSale, 'id' | 'amountOwed' | 'status'>) => Promise<void>;
     loading: boolean;
 }
 
@@ -20,36 +19,69 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const [creditData, setCreditData] = useState<CreditSale[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            const { recentActivity: initialActivity, creditData: initialCredit } = await getDashboardData();
-            setRecentActivity(initialActivity);
-            setCreditData(initialCredit);
+    const fetchData = async () => {
+        try {
+            const [activityRes, creditRes] = await Promise.all([
+                fetch('/api/transactions'),
+                fetch('/api/credit')
+            ]);
+            const [activity, credit] = await Promise.all([
+                activityRes.json(),
+                creditRes.json()
+            ]);
+
+            setRecentActivity(activity.map((tx: any) => ({...tx, date: new Date(tx.date)})));
+            setCreditData(credit.map((sale: any) => ({...sale, saleDate: new Date(sale.saleDate), expectedPaymentDate: new Date(sale.expectedPaymentDate)})));
+        } catch (error) {
+            console.error("Failed to fetch data:", error);
+        } finally {
             setLoading(false);
         }
+    };
+
+    useEffect(() => {
         fetchData();
     }, []);
 
-    const addTransaction = (newTx: Omit<Transaction, 'id'>) => {
-        const txWithId = { ...newTx, id: new Date().toISOString() + Math.random() };
-        setRecentActivity(prev => [txWithId, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    const addTransaction = async (newTx: Omit<Transaction, 'id'>) => {
+        try {
+            const response = await fetch('/api/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newTx),
+            });
+            if (response.ok) {
+                // re-fetch all data to ensure consistency
+                await fetchData();
+            }
+        } catch (error) {
+            console.error("Failed to add transaction:", error);
+        }
     };
 
-    const addCreditSale = (newSale: Omit<CreditSale, 'id' | 'amountOwed' | 'status'>) => {
-        const saleWithId: CreditSale = { 
-            ...newSale, 
-            id: new Date().toISOString() + Math.random(),
-            amountOwed: newSale.liters * newSale.pricePerLiter,
-            status: 'outstanding'
-        };
-        setCreditData(prev => [saleWithId, ...prev]);
-        addTransaction({
-            type: 'sale',
-            date: newSale.saleDate,
-            description: `Credit to ${newSale.customerName}`,
-            amount: newSale.liters,
-            value: saleWithId.amountOwed
-        });
+    const addCreditSale = async (newSale: Omit<CreditSale, 'id' | 'amountOwed' | 'status'>) => {
+         try {
+            const creditResponse = await fetch('/api/credit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSale),
+            });
+
+            if(creditResponse.ok) {
+                const addedCreditSale = await creditResponse.json();
+                // Also add a corresponding transaction for the sale
+                await addTransaction({
+                    type: 'sale',
+                    date: newSale.saleDate,
+                    description: `Credit to ${newSale.customerName}`,
+                    amount: newSale.liters,
+                    value: addedCreditSale.amountOwed
+                });
+            }
+
+        } catch (error) {
+            console.error("Failed to add credit sale:", error);
+        }
     };
 
     const value = {

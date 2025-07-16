@@ -1,0 +1,68 @@
+{
+  "transactions": [
+    {
+      "id": "1",
+      "type": "delivery",
+      "date": "2024-07-28T12:00:00.000Z",
+      "description": "Milk delivery",
+      "amount": 50,
+      "value": -1750
+    },
+    {
+      "id": "2",
+      "type": "sale",
+      "date": "2024-07-28T12:00:00.000Z",
+      "description": "Cash sale",
+      "amount": 45,
+      "value": 2700
+    },
+    {
+      "id": "3",
+      "type": "delivery",
+      "date": "2024-07-29T12:00:00.000Z",
+      "description": "Milk delivery",
+      "amount": 55,
+      "value": -1925
+    },
+    {
+      "id": "4",
+      "type": "sale",
+      "date": "2024-07-29T12:00:00.000Z",
+      "description": "Credit to J. Doe",
+      "amount": 10,
+      "value": 650
+    }
+  ],
+  "creditSales": [
+    {
+      "id": "credit1",
+      "customerName": "John Doe",
+      "liters": 10,
+      "pricePerLiter": 65,
+      "amountOwed": 650,
+      "saleDate": "2024-07-29T12:00:00.000Z",
+      "expectedPaymentDate": "2024-08-05T12:00:00.000Z",
+      "status": "outstanding"
+    },
+    {
+      "id": "credit2",
+      "customerName": "Jane Smith",
+      "liters": 5,
+      "pricePerLiter": 65,
+      "amountOwed": 325,
+      "saleDate": "2024-07-27T12:00:00.000Z",
+      "expectedPaymentDate": "2024-08-03T12:00:00.000Z",
+      "status": "outstanding"
+    },
+    {
+      "id": "credit3",
+      "customerName": "Peter Jones",
+      "liters": 8,
+      "pricePerLiter": 60,
+      "amountOwed": 480,
+      "saleDate": "2024-07-24T12:00:00.000Z",
+      "expectedPaymentDate": "2024-07-31T12:00:00.000Z",
+      "status": "paid"
+    }
+  ]
+}
