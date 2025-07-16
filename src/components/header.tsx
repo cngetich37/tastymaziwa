@@ -6,7 +6,7 @@ export function Header() {
       <div className="flex items-center gap-2">
         <Logo />
         <h1 className="text-xl font-bold tracking-tight text-primary font-headline">
-          TastyMaziwa Profit Tracker
+          TastyMaziwa
         </h1>
       </div>
     </header>

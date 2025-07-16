@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'TastyMaziwa Profit Tracker',
+  title: 'TastyMaziwa',
   description: 'Track your milk business profits effortlessly.',
 };
 
