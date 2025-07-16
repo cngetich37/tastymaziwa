@@ -55,8 +55,8 @@ export function DashboardClient({
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        {stats.map(stat => (
-          <MetricCard key={stat.key} {...stat} />
+        {stats.map(({ key, ...rest }) => (
+          <MetricCard key={key} {...rest} />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 md:gap-8 xl:grid-cols-3">
