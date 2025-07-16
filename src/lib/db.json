@@ -3,7 +3,7 @@
     {
       "id": "1",
       "type": "delivery",
-      "date": "2024-07-28T12:00:00.000Z",
+      "date": "2024-07-23T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 50,
       "value": -1750
@@ -11,24 +11,112 @@
     {
       "id": "2",
       "type": "sale",
-      "date": "2024-07-28T12:00:00.000Z",
+      "date": "2024-07-23T14:00:00.000Z",
       "description": "Cash sale",
-      "amount": 45,
-      "value": 2700
+      "amount": 48,
+      "value": 2880
     },
     {
       "id": "3",
       "type": "delivery",
-      "date": "2024-07-29T12:00:00.000Z",
+      "date": "2024-07-24T10:00:00.000Z",
+      "description": "Milk delivery",
+      "amount": 52,
+      "value": -1820
+    },
+    {
+      "id": "4",
+      "type": "sale",
+      "date": "2024-07-24T14:00:00.000Z",
+      "description": "Cash sale",
+      "amount": 50,
+      "value": 3000
+    },
+    {
+      "id": "5",
+      "type": "delivery",
+      "date": "2024-07-25T10:00:00.000Z",
+      "description": "Milk delivery",
+      "amount": 48,
+      "value": -1680
+    },
+    {
+      "id": "6",
+      "type": "sale",
+      "date": "2024-07-25T14:00:00.000Z",
+      "description": "Credit to P. Jones",
+      "amount": 20,
+      "value": 1300
+    },
+    {
+      "id": "7",
+      "type": "delivery",
+      "date": "2024-07-26T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 55,
       "value": -1925
     },
     {
-      "id": "4",
+      "id": "8",
       "type": "sale",
-      "date": "2024-07-29T12:00:00.000Z",
-      "description": "Credit to J. Doe",
+      "date": "2024-07-26T14:00:00.000Z",
+      "description": "Cash sale",
+      "amount": 55,
+      "value": 3300
+    },
+    {
+      "id": "9",
+      "type": "delivery",
+      "date": "2024-07-27T10:00:00.000Z",
+      "description": "Milk delivery",
+      "amount": 50,
+      "value": -1750
+    },
+    {
+      "id": "10",
+      "type": "sale",
+      "date": "2024-07-27T14:00:00.000Z",
+      "description": "Credit to J. Smith",
+      "amount": 5,
+      "value": 325
+    },
+    {
+      "id": "11",
+      "type": "payment",
+      "date": "2024-07-27T16:00:00.000Z",
+      "description": "Payment for 100L",
+      "amount": 100,
+      "value": -3500
+    },
+    {
+      "id": "12",
+      "type": "delivery",
+      "date": "2024-07-28T10:00:00.000Z",
+      "description": "Milk delivery",
+      "amount": 60,
+      "value": -2100
+    },
+    {
+      "id": "13",
+      "type": "sale",
+      "date": "2024-07-28T14:00:00.000Z",
+      "description": "Cash sale",
+      "amount": 58,
+      "value": 3480
+    },
+    {
+      "id": "14",
+      "type": "delivery",
+      "date": "2024-07-29T10:00:00.000Z",
+      "description": "Milk delivery",
+      "amount": 55,
+      "value": -1925
+    },
+    {
+      "id": "15",
+      "type": "sale",
+      "date": "2024-07-29T14:00:00.000Z",
+      "description": "Credit to John Doe",
       "amount": 10,
       "value": 650
     }
@@ -57,12 +145,12 @@
     {
       "id": "credit3",
       "customerName": "Peter Jones",
-      "liters": 8,
-      "pricePerLiter": 60,
-      "amountOwed": 480,
-      "saleDate": "2024-07-24T12:00:00.000Z",
-      "expectedPaymentDate": "2024-07-31T12:00:00.000Z",
-      "status": "paid"
+      "liters": 20,
+      "pricePerLiter": 65,
+      "amountOwed": 1300,
+      "saleDate": "2024-07-25T12:00:00.000Z",
+      "expectedPaymentDate": "2024-08-01T12:00:00.000Z",
+      "status": "outstanding"
     }
   ]
 }
