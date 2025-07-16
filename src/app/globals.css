@@ -26,9 +26,9 @@
     --radius: 0.5rem;
     --chart-1: 120 30% 45%;
     --chart-2: 30 65% 55%;
-    --chart-3: 20 80% 50%;
-    --chart-4: 110 30% 60%;
-    --chart-5: 25 20% 40%;
+    --chart-3: 25 35% 35%; /* Soil Brown */
+    --chart-4: 205 50% 60%; /* Sky Blue */
+    --chart-5: 40 100% 75%; /* Sunflower Yellow */
   }
 
   .dark {
@@ -53,9 +53,9 @@
     --ring: 120 30% 45%;
     --chart-1: 120 30% 45%;
     --chart-2: 30 65% 55%;
-    --chart-3: 20 80% 50%;
-    --chart-4: 110 30% 60%;
-    --chart-5: 25 20% 70%;
+    --chart-3: 25 35% 45%; /* Soil Brown */
+    --chart-4: 205 50% 50%; /* Sky Blue */
+    --chart-5: 40 90% 65%; /* Sunflower Yellow */
   }
 }
 
