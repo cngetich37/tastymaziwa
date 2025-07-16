@@ -37,6 +37,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
 
     // Payment State
     const [paymentAmount, setPaymentAmount] = useState('');
+    const [litersPaidFor, setLitersPaidFor] = useState('');
     const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
 
     const handleDeliverySubmit = (e: React.FormEvent) => {
@@ -109,8 +110,9 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
     const handlePaymentSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const amount = parseFloat(paymentAmount);
-        if (isNaN(amount) || amount <= 0) {
-            toast({ variant: 'destructive', title: "Invalid Input", description: "Please enter a valid payment amount."});
+        const liters = parseFloat(litersPaidFor);
+        if (isNaN(amount) || amount <= 0 || isNaN(liters) || liters <= 0) {
+            toast({ variant: 'destructive', title: "Invalid Input", description: "Please enter a valid payment amount and liter quantity."});
             return;
         }
          if (!paymentDate) {
@@ -120,12 +122,13 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
         onNewTransaction({
             type: 'payment',
             date: paymentDate,
-            description: 'Payment to milkman',
-            amount: amount,
-            value: 0, // A payment to milkman affects debt, not directly daily P/L
+            description: `Payment for ${liters}L`,
+            amount: liters,
+            value: -amount,
         });
-        toast({ title: "Payment Recorded", description: `Paid KES ${amount} to milkman on ${format(paymentDate, "PPP")}.`});
+        toast({ title: "Payment Recorded", description: `Paid KES ${amount} for ${liters}L on ${format(paymentDate, "PPP")}.`});
         setPaymentAmount('');
+        setLitersPaidFor('');
     };
 
 
@@ -166,7 +169,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={saleDate}
                                             onSelect={setSaleDate}
-                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -247,7 +250,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={deliveryDate}
                                             onSelect={setDeliveryDate}
-                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -286,15 +289,21 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={paymentDate}
                                             onSelect={setPaymentDate}
-                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                                             initialFocus
                                         />
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                             <div className="space-y-1.5">
-                                <Label htmlFor="payment-amount">Amount Paid to Milkman (KES)</Label>
-                                <Input id="payment-amount" type="number" step="0.01" placeholder="e.g. 1500" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="liters-paid">Liters Paid For</Label>
+                                    <Input id="liters-paid" type="number" step="0.1" placeholder="e.g. 50" value={litersPaidFor} onChange={e => setLitersPaidFor(e.target.value)} />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="payment-amount">Amount Paid (KES)</Label>
+                                    <Input id="payment-amount" type="number" step="0.01" placeholder="e.g. 1750" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} />
+                                </div>
                             </div>
                             <Button type="submit" className="w-full !mt-6">Record Payment</Button>
                         </form>

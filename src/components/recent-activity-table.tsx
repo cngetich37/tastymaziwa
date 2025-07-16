@@ -47,7 +47,7 @@ export function RecentActivityTable({ transactions }: { transactions: Transactio
                   "text-right font-medium font-mono",
                   tx.value > 0 ? "text-green-700 dark:text-green-500" : tx.value < 0 ? "text-destructive" : "text-muted-foreground"
                 )}>
-                  {tx.value > 0 ? '+' : ''}{tx.value.toLocaleString()}
+                  {tx.value === 0 ? '' : (tx.value > 0 ? '+' : '')}{tx.value.toLocaleString()}
                 </TableCell>
               </TableRow>
             ))}

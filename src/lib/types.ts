@@ -5,8 +5,8 @@ export interface Transaction {
   type: 'delivery' | 'sale' | 'payment' | 'credit-payment';
   date: Date;
   description: string;
-  amount: number; // can be liters for delivery/sale, or currency for payment
-  value: number; // monetary value
+  amount: number; // For delivery/sale/payment, this is in liters. For credit-payment, it's currency.
+  value: number; // The monetary value of the transaction. Typically positive for sales, negative for costs/payments.
 }
 
 export interface CreditSale {
