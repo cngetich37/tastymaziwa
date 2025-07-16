@@ -6,13 +6,11 @@ import { MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "./ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { differenceInDays, format } from "date-fns";
+import { useData } from "@/context/data-context";
 
-interface CreditTableProps {
-  creditSales: CreditSale[];
-}
-
-export function CreditTable({ creditSales }: CreditTableProps) {
-  const outstandingSales = creditSales.filter(s => s.status === 'outstanding');
+export function CreditTable() {
+  const { creditData } = useData();
+  const outstandingSales = creditData.filter(s => s.status === 'outstanding');
 
   const getDueDateColor = (dueDate: Date) => {
     const today = new Date();
@@ -27,7 +25,7 @@ export function CreditTable({ creditSales }: CreditTableProps) {
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Outstanding Credit</CardTitle>
-        <CardDescription>Sales made on credit that are yet to be paid.</CardDescription>
+        <CardDescription>Sales made on credit that are yet to be paid as of {format(new Date(), 'PPP')}.</CardDescription>
       </CardHeader>
       <CardContent className="max-h-[400px] overflow-y-auto">
         <Table>

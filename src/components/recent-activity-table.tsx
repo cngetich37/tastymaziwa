@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import type { Transaction } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const getBadgeVariant = (type: Transaction['type']): "default" | "secondary" | "destructive" | "outline" => {
     switch(type) {
@@ -19,7 +20,7 @@ export function RecentActivityTable({ transactions }: { transactions: Transactio
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Recent Activity</CardTitle>
-        <CardDescription>A log of your recent sales, deliveries, and payments.</CardDescription>
+        <CardDescription>A log of sales, deliveries, and payments as of {format(new Date(), "PPP")}.</CardDescription>
       </CardHeader>
       <CardContent className="max-h-[400px] overflow-y-auto">
         <Table>
