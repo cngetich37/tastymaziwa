@@ -166,6 +166,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={saleDate}
                                             onSelect={setSaleDate}
+                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -213,6 +214,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                                     mode="single"
                                                     selected={paymentDueDate}
                                                     onSelect={setPaymentDueDate}
+                                                    disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                                                     initialFocus
                                                 />
                                             </PopoverContent>
@@ -245,6 +247,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={deliveryDate}
                                             onSelect={setDeliveryDate}
+                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -283,6 +286,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={paymentDate}
                                             onSelect={setPaymentDate}
+                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                                             initialFocus
                                         />
                                     </PopoverContent>
