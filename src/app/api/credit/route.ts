@@ -5,7 +5,8 @@ import type { CreditSale } from '@/lib/types';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const creditSales = await db.read().creditSales;
+  const dbData = await db.read();
+  const creditSales = dbData.creditSales;
   return NextResponse.json(creditSales.sort((a,b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime()));
 }
 

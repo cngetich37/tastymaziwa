@@ -5,7 +5,8 @@ import type { Transaction } from '@/lib/types';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const transactions = await db.read().transactions;
+  const dbData = await db.read();
+  const transactions = dbData.transactions;
   return NextResponse.json(transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 }
 
