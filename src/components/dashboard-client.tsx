@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import type { Stat, ProfitData } from '@/lib/types';
 import { MetricCard } from '@/components/metric-card';
 import { ProfitChart } from '@/components/profit-chart';
@@ -12,11 +12,6 @@ import { subDays, format, isToday, isSameDay } from 'date-fns';
 
 export function DashboardClient() {
   const { recentActivity, creditData } = useData();
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   // Filter for today's transactions
   const todayTransactions = recentActivity.filter(t => isToday(t.date));
@@ -70,8 +65,8 @@ export function DashboardClient() {
                 <CardTitle className="font-headline">Weekly Profit</CardTitle>
                 <CardDescription>Profit overview for the last 7 days ending {format(new Date(), 'PPP')}.</CardDescription>
             </CardHeader>
-            <CardContent className="min-h-[300px]">
-                {isClient && <ProfitChart data={profitData} />}
+            <CardContent>
+                <ProfitChart data={profitData} />
             </CardContent>
         </Card>
       </div>
