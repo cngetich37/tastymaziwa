@@ -1,5 +1,6 @@
 import { Logo } from '@/components/logo';
 import { Nav } from '@/components/nav';
+import { ThemeToggle } from './theme-toggle';
 
 export function Header() {
   return (
@@ -11,6 +12,9 @@ export function Header() {
         </h1>
       </div>
       <Nav />
+      <div className="ml-auto">
+        <ThemeToggle />
+      </div>
     </header>
   );
 }
