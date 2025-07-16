@@ -7,7 +7,6 @@ export default async function Home() {
     stats,
     profitData,
     recentActivity,
-    creditData,
   } = await getDashboardData();
 
   return (
@@ -18,7 +17,6 @@ export default async function Home() {
           initialStats={stats}
           initialProfitData={profitData}
           initialRecentActivity={recentActivity}
-          initialCreditData={creditData}
         />
       </main>
     </div>

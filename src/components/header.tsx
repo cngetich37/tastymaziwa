@@ -1,4 +1,5 @@
 import { Logo } from '@/components/logo';
+import { Nav } from '@/components/nav';
 
 export function Header() {
   return (
@@ -9,6 +10,7 @@ export function Header() {
           TastyMaziwa
         </h1>
       </div>
+      <Nav />
     </header>
   );
 }

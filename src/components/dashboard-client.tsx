@@ -5,52 +5,22 @@ import type { Stat, ProfitData, Transaction, CreditSale } from '@/lib/types';
 import { MetricCard } from '@/components/metric-card';
 import { ProfitChart } from '@/components/profit-chart';
 import { RecentActivityTable } from '@/components/recent-activity-table';
-import { CreditTable } from '@/components/credit-table';
-import { DataEntryTabs } from '@/components/data-entry-tabs';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 
 interface DashboardClientProps {
   initialStats: Stat[];
   initialProfitData: ProfitData[];
   initialRecentActivity: Transaction[];
-  initialCreditData: CreditSale[];
 }
 
 export function DashboardClient({
   initialStats,
   initialProfitData,
   initialRecentActivity,
-  initialCreditData,
 }: DashboardClientProps) {
   const [stats, setStats] = useState<Stat[]>(initialStats);
   const [profitData, setProfitData] = useState<ProfitData[]>(initialProfitData);
   const [recentActivity, setRecentActivity] = useState<Transaction[]>(initialRecentActivity);
-  const [creditData, setCreditData] = useState<CreditSale[]>(initialCreditData);
-
-  // In a real app, these handlers would call an API
-  // For now, they'll just update local state to demonstrate interactivity
-  const handleNewTransaction = (newTx: Omit<Transaction, 'id'>) => {
-    const txWithId = { ...newTx, id: new Date().toISOString() };
-    setRecentActivity(prev => [txWithId, ...prev].sort((a,b) => b.date.getTime() - a.date.getTime()));
-    // Here you would also recalculate stats and update them
-  };
-
-  const handleNewCreditSale = (newSale: Omit<CreditSale, 'id' | 'amountOwed' | 'status'>) => {
-    const saleWithId: CreditSale = { 
-      ...newSale, 
-      id: new Date().toISOString(),
-      amountOwed: newSale.liters * newSale.pricePerLiter,
-      status: 'outstanding'
-    };
-    setCreditData(prev => [saleWithId, ...prev]);
-    handleNewTransaction({
-      type: 'sale',
-      date: newSale.saleDate,
-      description: `Credit to ${newSale.customerName}`,
-      amount: newSale.liters,
-      value: saleWithId.amountOwed
-    });
-  };
 
   return (
     <>
@@ -59,7 +29,7 @@ export function DashboardClient({
           <MetricCard key={key} {...rest} />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 md:gap-8 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:gap-8">
         <Card className="xl:col-span-2">
             <CardHeader>
                 <CardTitle className="font-headline">Weekly Profit</CardTitle>
@@ -69,13 +39,9 @@ export function DashboardClient({
                 <ProfitChart data={profitData} />
             </CardContent>
         </Card>
-        <div className="xl:col-span-1">
-          <DataEntryTabs onNewTransaction={handleNewTransaction} onNewCreditSale={handleNewCreditSale} />
-        </div>
       </div>
-      <div className="grid gap-4 md:gap-8 lg:grid-cols-2">
+      <div className="grid gap-4 md:gap-8 lg:grid-cols-1">
         <RecentActivityTable transactions={recentActivity} />
-        <CreditTable creditSales={creditData} />
       </div>
     </>
   );
