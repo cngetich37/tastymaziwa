@@ -7,23 +7,28 @@ import { ProfitChart } from '@/components/profit-chart';
 import { RecentActivityTable } from '@/components/recent-activity-table';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useData } from '@/context/data-context';
-import { subDays, format } from 'date-fns';
+import { subDays, format, isToday } from 'date-fns';
 
 
 export function DashboardClient() {
   const { recentActivity, creditData } = useData();
 
-  // Calculate stats
-  const totalRevenue = recentActivity.filter(t => t.type === 'sale').reduce((sum, t) => sum + t.value, 0);
-  const totalCost = recentActivity.filter(t => t.type === 'delivery' || t.type === 'payment').reduce((sum, t) => sum + t.value, 0);
-  const totalProfit = totalRevenue + totalCost;
+  // Filter for today's transactions
+  const todayTransactions = recentActivity.filter(t => isToday(t.date));
+
+  // Calculate stats for today
+  const dailyRevenue = todayTransactions.filter(t => t.type === 'sale').reduce((sum, t) => sum + t.value, 0);
+  const dailyCost = todayTransactions.filter(t => t.type === 'delivery' || t.type === 'payment').reduce((sum, t) => sum + t.value, 0);
+  const dailyProfit = dailyRevenue + dailyCost;
+
+  // Calculate cumulative stats
   const totalCredit = creditData.filter(c => c.status === 'outstanding').reduce((sum, c) => sum + c.amountOwed, 0);
   const totalOwed = recentActivity.filter(t => t.type === 'delivery').reduce((sum, t) => sum + t.value, 0);
 
 
   const stats: Stat[] = [
-    { key: 'profit', label: 'Total Profit', value: `KES ${totalProfit.toLocaleString()}`, change: '+20.1%', changeType: 'increase', icon: 'TrendingUp' },
-    { key: 'revenue', label: 'Total Revenue', value: `KES ${totalRevenue.toLocaleString()}`, change: '+15.2%', changeType: 'increase', icon: 'Banknote' },
+    { key: 'profit', label: 'Daily Profit', value: `KES ${dailyProfit.toLocaleString()}`, change: '+20.1%', changeType: 'increase', icon: 'TrendingUp' },
+    { key: 'revenue', label: 'Daily Revenue', value: `KES ${dailyRevenue.toLocaleString()}`, change: '+15.2%', changeType: 'increase', icon: 'Banknote' },
     { key: 'credit', label: 'Outstanding Credit', value: `KES ${totalCredit.toLocaleString()}`, change: '-5.0%', changeType: 'decrease', icon: 'Users' },
     { key: 'owed', label: 'Owed to Milkman', value: `KES ${(-totalOwed).toLocaleString()}`, change: '+10%', changeType: 'increase', icon: 'Droplet' },
   ];
