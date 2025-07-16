@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { Stat, ProfitData, Transaction, CreditSale } from '@/lib/types';
+import type { Stat, ProfitData, Transaction } from '@/lib/types';
 import { MetricCard } from '@/components/metric-card';
 import { ProfitChart } from '@/components/profit-chart';
 import { RecentActivityTable } from '@/components/recent-activity-table';

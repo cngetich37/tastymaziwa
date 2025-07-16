@@ -5,7 +5,7 @@ const mockTransactions: Transaction[] = [
   { id: '1', type: 'delivery', date: new Date(new Date().setDate(new Date().getDate() - 1)), description: 'Milk delivery', amount: 50, value: -1750 },
   { id: '2', type: 'sale', date: new Date(new Date().setDate(new Date().getDate() - 1)), description: 'Cash sale', amount: 45, value: 2700 },
   { id: '3', type: 'delivery', date: new Date(), description: 'Milk delivery', amount: 55, value: -1925 },
-  { id: '4', type: 'sale', date: new Date(), description: 'Credit sale to J. Doe', amount: 10, value: 650 },
+  { id: '4', type: 'sale', date: new Date(), description: 'Credit to J. Doe', amount: 10, value: 650 },
 ];
 
 const mockCreditSales: CreditSale[] = [
@@ -36,7 +36,7 @@ export async function getDashboardData() {
     { key: 'profit', label: 'Total Profit', value: `KES ${totalProfit.toLocaleString()}`, change: '+20.1%', changeType: 'increase', icon: 'TrendingUp' },
     { key: 'revenue', label: 'Total Revenue', value: `KES ${totalRevenue.toLocaleString()}`, change: '+15.2%', changeType: 'increase', icon: 'Banknote' },
     { key: 'credit', label: 'Outstanding Credit', value: `KES ${totalCredit.toLocaleString()}`, change: '-5.0%', changeType: 'decrease', icon: 'Users' },
-    { key: 'milk_owed', label: 'Owed to Milkman', value: `KES ${(-totalCost).toLocaleString()}`, change: '+10%', changeType: 'increase', icon: 'Droplet' },
+    { key: 'owed', label: 'Owed to Milkman', value: `KES ${(-totalCost).toLocaleString()}`, change: '+10%', changeType: 'increase', icon: 'Droplet' },
   ];
 
   return {
