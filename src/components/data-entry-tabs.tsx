@@ -25,16 +25,19 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
     // Delivery State
     const [deliveryLiters, setDeliveryLiters] = useState('');
     const [deliveryCost, setDeliveryCost] = useState('');
+    const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(new Date());
 
     // Sale State
     const [saleLiters, setSaleLiters] = useState('');
     const [salePrice, setSalePrice] = useState('');
+    const [saleDate, setSaleDate] = useState<Date | undefined>(new Date());
     const [isCredit, setIsCredit] = useState(false);
     const [customerName, setCustomerName] = useState('');
     const [paymentDueDate, setPaymentDueDate] = useState<Date | undefined>(new Date());
 
     // Payment State
     const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
 
     const handleDeliverySubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,14 +47,18 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
             toast({ variant: 'destructive', title: "Invalid Input", description: "Please enter valid numbers for liters and cost."});
             return;
         }
+        if (!deliveryDate) {
+            toast({ variant: 'destructive', title: "Invalid Input", description: "Please select a delivery date."});
+            return;
+        }
         onNewTransaction({
             type: 'delivery',
-            date: new Date(),
+            date: deliveryDate,
             description: 'Milk delivery',
             amount: liters,
             value: - (liters * cost),
         });
-        toast({ title: "Delivery Recorded", description: `${liters}L at KES ${cost}/L.`});
+        toast({ title: "Delivery Recorded", description: `${liters}L at KES ${cost}/L on ${format(deliveryDate, "PPP")}.`});
         setDeliveryLiters('');
         setDeliveryCost('');
     };
@@ -64,6 +71,10 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
             toast({ variant: 'destructive', title: "Invalid Input", description: "Please enter valid numbers for liters and price."});
             return;
         }
+        if (!saleDate) {
+            toast({ variant: 'destructive', title: "Invalid Input", description: "Please select a sale date."});
+            return;
+        }
 
         if(isCredit) {
             if (!customerName || !paymentDueDate) {
@@ -74,19 +85,19 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                 customerName,
                 liters,
                 pricePerLiter: price,
-                saleDate: new Date(),
+                saleDate: saleDate,
                 expectedPaymentDate: paymentDueDate,
             });
-            toast({ title: "Credit Sale Recorded", description: `${liters}L to ${customerName}.`});
+            toast({ title: "Credit Sale Recorded", description: `${liters}L to ${customerName} on ${format(saleDate, "PPP")}.`});
         } else {
             onNewTransaction({
                 type: 'sale',
-                date: new Date(),
+                date: saleDate,
                 description: 'Cash sale',
                 amount: liters,
                 value: liters * price,
             });
-            toast({ title: "Cash Sale Recorded", description: `${liters}L at KES ${price}/L.`});
+            toast({ title: "Cash Sale Recorded", description: `${liters}L at KES ${price}/L on ${format(saleDate, "PPP")}.`});
         }
         setSaleLiters('');
         setSalePrice('');
@@ -102,14 +113,18 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
             toast({ variant: 'destructive', title: "Invalid Input", description: "Please enter a valid payment amount."});
             return;
         }
+         if (!paymentDate) {
+            toast({ variant: 'destructive', title: "Invalid Input", description: "Please select a payment date."});
+            return;
+        }
         onNewTransaction({
             type: 'payment',
-            date: new Date(),
+            date: paymentDate,
             description: 'Payment to milkman',
             amount: amount,
             value: 0, // A payment to milkman affects debt, not directly daily P/L
         });
-        toast({ title: "Payment Recorded", description: `Paid KES ${amount} to milkman.`});
+        toast({ title: "Payment Recorded", description: `Paid KES ${amount} to milkman on ${format(paymentDate, "PPP")}.`});
         setPaymentAmount('');
     };
 
@@ -131,6 +146,31 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                     </TabsList>
                     <TabsContent value="sale">
                         <form onSubmit={handleSaleSubmit} className="space-y-4 pt-4">
+                            <div className="space-y-1.5">
+                                <Label>Sale Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !saleDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {saleDate ? format(saleDate, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={saleDate}
+                                            onSelect={setSaleDate}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <Label htmlFor="sale-liters">Liters Sold</Label>
@@ -185,6 +225,31 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                     </TabsContent>
                     <TabsContent value="delivery">
                          <form onSubmit={handleDeliverySubmit} className="space-y-4 pt-4">
+                             <div className="space-y-1.5">
+                                <Label>Delivery Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !deliveryDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {deliveryDate ? format(deliveryDate, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={deliveryDate}
+                                            onSelect={setDeliveryDate}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
                             <div className="space-y-1.5">
                                 <Label htmlFor="delivery-liters">Liters Delivered</Label>
                                 <Input id="delivery-liters" type="number" step="0.1" placeholder="e.g. 50" value={deliveryLiters} onChange={(e) => setDeliveryLiters(e.target.value)} />
@@ -198,6 +263,31 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                     </TabsContent>
                     <TabsContent value="payment">
                         <form onSubmit={handlePaymentSubmit} className="space-y-4 pt-4">
+                             <div className="space-y-1.5">
+                                <Label>Payment Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !paymentDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {paymentDate ? format(paymentDate, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={paymentDate}
+                                            onSelect={setPaymentDate}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
                              <div className="space-y-1.5">
                                 <Label htmlFor="payment-amount">Amount Paid to Milkman (KES)</Label>
                                 <Input id="payment-amount" type="number" step="0.01" placeholder="e.g. 1500" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} />
