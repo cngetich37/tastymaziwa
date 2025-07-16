@@ -34,11 +34,11 @@ export function ProfitChart({ data }: ProfitChartProps) {
                         color: 'hsl(var(--card-foreground))'
                     }}
                     labelStyle={{ fontWeight: 'bold' }}
-                    itemStyle={{ color: 'hsl(var(--primary))' }}
+                    itemStyle={{ color: 'hsl(var(--chart-1))' }}
                     formatter={(value: number) => [`KES ${value.toLocaleString()}`, 'Profit']}
                     cursor={{ fill: 'hsl(var(--primary) / 0.1)' }}
                 />
-                <Bar dataKey="profit" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="profit" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
             </BarChart>
         </ResponsiveContainer>
     </div>
