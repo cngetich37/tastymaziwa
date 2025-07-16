@@ -65,7 +65,7 @@ export function DashboardClient() {
                 <CardTitle className="font-headline">Weekly Profit</CardTitle>
                 <CardDescription>Profit overview for the last 7 days ending {format(new Date(), 'PPP')}.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-h-[300px]">
                 <ProfitChart data={profitData} />
             </CardContent>
         </Card>

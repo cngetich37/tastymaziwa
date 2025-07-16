@@ -2,12 +2,23 @@
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import type { ProfitData } from '@/lib/types';
+import { useEffect, useState } from 'react';
 
 interface ProfitChartProps {
   data: ProfitData[];
 }
 
 export function ProfitChart({ data }: ProfitChartProps) {
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    if (!isClient) {
+        return null; // Or a loading skeleton
+    }
+    
   return (
     <div className="h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">
