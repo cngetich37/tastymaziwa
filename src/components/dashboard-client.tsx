@@ -7,7 +7,7 @@ import { ProfitChart } from '@/components/profit-chart';
 import { RecentActivityTable } from '@/components/recent-activity-table';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useData } from '@/context/data-context';
-import { subDays, format, isToday } from 'date-fns';
+import { subDays, format, isToday, isSameDay } from 'date-fns';
 
 
 export function DashboardClient() {
@@ -36,14 +36,13 @@ export function DashboardClient() {
   // Calculate profit data for chart
   const profitData: ProfitData[] = Array.from({ length: 7 }, (_, i) => {
     const date = subDays(new Date(), 6 - i);
-    const dateString = date.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
     
     const revenueForDay = recentActivity
-      .filter(t => t.type === 'sale' && t.date.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' }) === dateString)
+      .filter(t => t.type === 'sale' && isSameDay(t.date, date))
       .reduce((sum, t) => sum + t.value, 0);
 
     const costForDay = recentActivity
-      .filter(t => (t.type === 'delivery' || t.type === 'payment') && t.date.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' }) === dateString)
+      .filter(t => (t.type === 'delivery' || t.type === 'payment') && isSameDay(t.date, date))
       .reduce((sum, t) => sum + t.value, 0);
       
     return {
