@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Stat, ProfitData } from '@/lib/types';
 import { MetricCard } from '@/components/metric-card';
 import { ProfitChart } from '@/components/profit-chart';
@@ -12,9 +12,15 @@ import { subDays, format, isToday, isSameDay } from 'date-fns';
 
 export function DashboardClient() {
   const { recentActivity, creditData } = useData();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
 
   // Filter for today's transactions
-  const todayTransactions = recentActivity.filter(t => isToday(t.date));
+  const todayTransactions = recentActivity.filter(t => isToday(new Date(t.date)));
 
   // Calculate stats for today
   const dailyRevenue = todayTransactions.filter(t => t.type === 'sale').reduce((sum, t) => sum + t.value, 0);
@@ -38,11 +44,11 @@ export function DashboardClient() {
     const date = subDays(new Date(), 6 - i);
     
     const revenueForDay = recentActivity
-      .filter(t => t.type === 'sale' && isSameDay(t.date, date))
+      .filter(t => t.type === 'sale' && isSameDay(new Date(t.date), date))
       .reduce((sum, t) => sum + t.value, 0);
 
     const costForDay = recentActivity
-      .filter(t => (t.type === 'delivery' || t.type === 'payment') && isSameDay(t.date, date))
+      .filter(t => (t.type === 'delivery' || t.type === 'payment') && isSameDay(new Date(t.date), date))
       .reduce((sum, t) => sum + t.value, 0);
       
     return {
@@ -65,8 +71,8 @@ export function DashboardClient() {
                 <CardTitle className="font-headline">Weekly Profit</CardTitle>
                 <CardDescription>Profit overview for the last 7 days ending {format(new Date(), 'PPP')}.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <ProfitChart data={profitData} />
+            <CardContent className="h-[300px]">
+                {isClient && <ProfitChart data={profitData} />}
             </CardContent>
         </Card>
       </div>
