@@ -41,6 +41,11 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
     const [litersPaidFor, setLitersPaidFor] = useState('');
     const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
 
+    const [isClient, setIsClient] = useState(false);
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
     const handleDeliverySubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const liters = parseFloat(deliveryLiters);
@@ -170,7 +175,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={saleDate}
                                             onSelect={setSaleDate}
-                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0)) }
+                                            disabled={isClient ? (date) => date > new Date() || date < new Date("1900-01-01") : undefined}
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -218,7 +223,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                                     mode="single"
                                                     selected={paymentDueDate}
                                                     onSelect={setPaymentDueDate}
-                                                    disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                                                    disabled={isClient ? (date) => date < new Date(new Date().setHours(0,0,0,0)) : undefined}
                                                     initialFocus
                                                 />
                                             </PopoverContent>
@@ -251,7 +256,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={deliveryDate}
                                             onSelect={setDeliveryDate}
-                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                                            disabled={isClient ? (date) => date > new Date() || date < new Date("1900-01-01") : undefined}
                                             initialFocus
                                         />
                                     </PopoverContent>
@@ -290,7 +295,7 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
                                             mode="single"
                                             selected={paymentDate}
                                             onSelect={setPaymentDate}
-                                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                                            disabled={isClient ? (date) => date > new Date() || date < new Date("1900-01-01") : undefined}
                                             initialFocus
                                         />
                                     </PopoverContent>
