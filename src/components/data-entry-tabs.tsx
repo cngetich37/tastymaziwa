@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,24 +26,29 @@ export function DataEntryTabs({ onNewTransaction, onNewCreditSale }: DataEntryTa
     // Delivery State
     const [deliveryLiters, setDeliveryLiters] = useState('');
     const [deliveryCost, setDeliveryCost] = useState('');
-    const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(new Date());
+    const [deliveryDate, setDeliveryDate] = useState<Date | undefined>();
 
     // Sale State
     const [saleLiters, setSaleLiters] = useState('');
     const [salePrice, setSalePrice] = useState('');
-    const [saleDate, setSaleDate] = useState<Date | undefined>(new Date());
+    const [saleDate, setSaleDate] = useState<Date | undefined>();
     const [isCredit, setIsCredit] = useState(false);
     const [customerName, setCustomerName] = useState('');
-    const [paymentDueDate, setPaymentDueDate] = useState<Date | undefined>(new Date());
+    const [paymentDueDate, setPaymentDueDate] = useState<Date | undefined>();
 
     // Payment State
     const [paymentAmount, setPaymentAmount] = useState('');
     const [litersPaidFor, setLitersPaidFor] = useState('');
-    const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
+    const [paymentDate, setPaymentDate] = useState<Date | undefined>();
 
     const [isClient, setIsClient] = useState(false);
     useEffect(() => {
         setIsClient(true);
+        const today = new Date();
+        setDeliveryDate(today);
+        setSaleDate(today);
+        setPaymentDueDate(today);
+        setPaymentDate(today);
     }, []);
 
     const handleDeliverySubmit = (e: React.FormEvent) => {
