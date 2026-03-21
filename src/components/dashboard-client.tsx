@@ -59,19 +59,25 @@ export function DashboardClient() {
 
 
   return (
-    <>
+    <div className="flex flex-col gap-6 w-full animate-in fade-in duration-700">
+      <div className="flex flex-col gap-1 mb-2">
+        <h2 className="text-3xl font-bold tracking-tight font-headline gradient-text w-fit">Dashboard Overview</h2>
+        <p className="text-muted-foreground">Track your daily sales, credit, and profit.</p>
+      </div>
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        {stats.map(({ key, ...rest }) => (
-          <MetricCard key={key} {...rest} />
+        {stats.map(({ key, ...rest }, index) => (
+          <div key={key} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}>
+            <MetricCard icon={rest.icon} label={rest.label} value={rest.value} change={rest.change} changeType={rest.changeType} />
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 md:gap-8">
-        <Card className="xl:col-span-2">
-            <CardHeader>
-                <CardTitle className="font-headline">Weekly Profit</CardTitle>
+        <Card className="xl:col-span-2 glass-card overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700" style={{ animationDelay: '150ms', animationFillMode: 'both' }}>
+            <CardHeader className="bg-muted/30 border-b border-border/50">
+                <CardTitle className="font-headline gradient-text inline-block w-fit">Weekly Profit</CardTitle>
                 <CardDescription>Profit overview for the last 7 days ending {format(new Date(), 'PPP')}.</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px]">
+            <CardContent className="h-[300px] pt-6">
                 {isClient && <ProfitChart data={profitData} />}
             </CardContent>
         </Card>
@@ -79,6 +85,6 @@ export function DashboardClient() {
       <div className="grid gap-4 md:gap-8 lg:grid-cols-1">
         <RecentActivityTable transactions={recentActivity} />
       </div>
-    </>
+    </div>
   );
 }

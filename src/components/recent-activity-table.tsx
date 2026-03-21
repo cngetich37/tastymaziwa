@@ -17,9 +17,9 @@ const getBadgeVariant = (type: Transaction['type']): "default" | "secondary" | "
 
 export function RecentActivityTable({ transactions }: { transactions: Transaction[] }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-headline">Recent Activity</CardTitle>
+    <Card className="glass-card overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700" style={{ animationDelay: '300ms', animationFillMode: 'both' }}>
+      <CardHeader className="bg-muted/30 border-b border-border/50">
+        <CardTitle className="font-headline gradient-text inline-block w-fit">Recent Activity</CardTitle>
         <CardDescription>A log of sales, deliveries, and payments as of {format(new Date(), "PPP")}.</CardDescription>
       </CardHeader>
       <CardContent className="max-h-[400px] overflow-y-auto">

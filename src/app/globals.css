@@ -4,58 +4,92 @@
 
 @layer base {
   :root {
-    --background: 220 20% 98%; /* A very light, almost white blue, like fresh milk */
-    --foreground: 24 10% 10%;
-    --card: 220 20% 100%;
-    --card-foreground: 24 10% 10%;
-    --popover: 220 20% 100%;
-    --popover-foreground: 24 10% 10%;
-    --primary: 120 30% 45%; /* A natural, earthy green */
-    --primary-foreground: 120 25% 95%;
-    --secondary: 30 50% 96%; /* Creamy off-white */
-    --secondary-foreground: 30 10% 20%;
-    --muted: 30 50% 96%;
-    --muted-foreground: 30 5% 45%;
-    --accent: 30 65% 55%; /* A warm, hay-like yellow/orange */
-    --accent-foreground: 30 10% 10%;
+    --background: 210 40% 98%; /* Refreshing light blue tinted background */
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    
+    /* Primary: Vibrant modern green */
+    --primary: 142 71% 45%; 
+    --primary-foreground: 144 100% 98%;
+    
+    /* Secondary: Soft creamy white */
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    
+    /* Muted and accents */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 30 15% 88%;
-    --input: 30 15% 88%;
-    --ring: 120 30% 45%;
-    --radius: 0.5rem;
-    --chart-1: 120 30% 45%;
-    --chart-2: 30 65% 55%;
-    --chart-3: 25 35% 35%; /* Soil Brown */
-    --chart-4: 205 50% 60%; /* Sky Blue */
-    --chart-5: 40 100% 75%; /* Sunflower Yellow */
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 142 71% 45%;
+    
+    --radius: 0.75rem;
+
+    /* Chart colors: vibrant and distinct */
+    --chart-1: 142 71% 45%;
+    --chart-2: 30 80% 55%;
+    --chart-3: 200 80% 50%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 
   .dark {
-    --background: 24 10% 10%;
-    --foreground: 0 0% 98%;
-    --card: 24 10% 15%;
-    --card-foreground: 0 0% 98%;
-    --popover: 24 10% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 120 30% 45%;
-    --primary-foreground: 120 25% 95%;
-    --secondary: 24 10% 20%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 24 10% 20%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 30 65% 55%;
-    --accent-foreground: 0 0% 98%;
+    /* Deep sleek slate background instead of pure black */
+    --background: 222 47% 7%; 
+    --foreground: 210 40% 98%;
+    /* Cards slightly elevated from background */
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    
+    /* Primary: Vibrant green */
+    --primary: 142 70% 50%;
+    --primary-foreground: 144 100% 10%;
+    
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 98%;
+    
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+    
+    --accent: 217 32% 17%;
+    --accent-foreground: 210 40% 98%;
+    
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 24 10% 25%;
-    --input: 24 10% 25%;
-    --ring: 120 30% 45%;
-    --chart-1: 120 30% 45%;
-    --chart-2: 30 65% 55%;
-    --chart-3: 25 35% 45%; /* Soil Brown */
-    --chart-4: 205 50% 50%; /* Sky Blue */
-    --chart-5: 40 90% 65%; /* Sunflower Yellow */
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 142 70% 50%;
+
+    --chart-1: 142 70% 50%;
+    --chart-2: 30 80% 55%;
+    --chart-3: 200 80% 50%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/60 dark:bg-black/40 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-sm;
+  }
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-lg border border-border shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30;
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-500;
   }
 }
 
