@@ -65,9 +65,9 @@ export function DashboardClient() {
         <p className="text-muted-foreground">Track your daily sales, credit, and profit.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        {stats.map(({ key, ...rest }, index) => (
-          <div key={key} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}>
-            <MetricCard icon={rest.icon} label={rest.label} value={rest.value} change={rest.change} changeType={rest.changeType} />
+        {stats.map((stat, index) => (
+          <div key={stat.key} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}>
+            <MetricCard {...stat} />
           </div>
         ))}
       </div>
