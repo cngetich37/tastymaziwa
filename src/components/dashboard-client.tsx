@@ -5,13 +5,15 @@ import type { Stat, ProfitData } from '@/lib/types';
 import { MetricCard } from '@/components/metric-card';
 import { ProfitChart } from '@/components/profit-chart';
 import { RecentActivityTable } from '@/components/recent-activity-table';
+import { CustomersTable } from '@/components/customers-table';
+import { QuickActions } from '@/components/quick-actions';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useData } from '@/context/data-context';
 import { subDays, format, isToday, isSameDay } from 'date-fns';
 
 
 export function DashboardClient() {
-  const { recentActivity, creditData } = useData();
+  const { recentActivity, creditData, subscriptions, stockData } = useData();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -28,15 +30,18 @@ export function DashboardClient() {
   const dailyProfit = dailyRevenue + dailyCost;
 
   // Calculate cumulative stats
-  const totalCredit = creditData.filter(c => c.status === 'outstanding').reduce((sum, c) => sum + c.amountOwed, 0);
-  const totalOwed = recentActivity.filter(t => t.type === 'delivery').reduce((sum, t) => sum + t.value, 0);
-
+  const activeSubsCount = subscriptions.filter(s => s.status === 'active').length;
+  
+  // Basic stock calculation (Intake - Sales)
+  const totalStockIntake = stockData.reduce((sum, s) => sum + s.intakeLiters, 0);
+  const totalSalesLiters = recentActivity.filter(t => t.type === 'sale').reduce((sum, t) => sum + t.amount, 0);
+  const currentStock = totalStockIntake - totalSalesLiters;
 
   const stats: Stat[] = [
     { key: 'profit', label: 'Daily Profit', value: `KES ${dailyProfit.toLocaleString()}`, change: '+20.1%', changeType: 'increase', icon: 'TrendingUp' },
     { key: 'revenue', label: 'Daily Revenue', value: `KES ${dailyRevenue.toLocaleString()}`, change: '+15.2%', changeType: 'increase', icon: 'Banknote' },
-    { key: 'credit', label: 'Outstanding Credit', value: `KES ${totalCredit.toLocaleString()}`, change: '-5.0%', changeType: 'decrease', icon: 'Users' },
-    { key: 'owed', label: 'Owed to Milkman', value: `KES ${(-totalOwed).toLocaleString()}`, change: '+10%', changeType: 'increase', icon: 'Droplet' },
+    { key: 'subs', label: 'Active Subscriptions', value: `${activeSubsCount}`, change: 'Recurring', icon: 'Users' },
+    { key: 'stock', label: 'Current Stock', value: `${currentStock}L`, change: 'Available Liters', icon: 'Droplet' },
   ];
 
   // Calculate profit data for chart
@@ -64,10 +69,11 @@ export function DashboardClient() {
         <h2 className="text-3xl font-bold tracking-tight font-headline gradient-text w-fit">Dashboard Overview</h2>
         <p className="text-muted-foreground">Track your daily sales, credit, and profit.</p>
       </div>
+      <QuickActions />
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        {stats.map((stat, index) => (
-          <div key={stat.key} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}>
-            <MetricCard {...stat} />
+        {stats.map(({ key, ...rest }, index) => (
+          <div key={key} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}>
+            <MetricCard {...rest} />
           </div>
         ))}
       </div>
@@ -82,7 +88,8 @@ export function DashboardClient() {
             </CardContent>
         </Card>
       </div>
-      <div className="grid gap-4 md:gap-8 lg:grid-cols-1">
+      <div className="grid gap-4 md:gap-8 lg:grid-cols-2">
+        <CustomersTable />
         <RecentActivityTable transactions={recentActivity} />
       </div>
     </div>

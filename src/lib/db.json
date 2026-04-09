@@ -1,10 +1,9 @@
-
 {
   "transactions": [
     {
       "id": "1",
       "type": "delivery",
-      "date": "2024-07-23T10:00:00.000Z",
+      "date": "2026-03-17T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 50,
       "value": -1750
@@ -12,7 +11,7 @@
     {
       "id": "2",
       "type": "sale",
-      "date": "2024-07-23T14:00:00.000Z",
+      "date": "2026-03-17T14:00:00.000Z",
       "description": "Cash sale",
       "amount": 48,
       "value": 2880
@@ -20,7 +19,7 @@
     {
       "id": "3",
       "type": "delivery",
-      "date": "2024-07-24T10:00:00.000Z",
+      "date": "2026-03-18T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 52,
       "value": -1820
@@ -28,7 +27,7 @@
     {
       "id": "4",
       "type": "sale",
-      "date": "2024-07-24T14:00:00.000Z",
+      "date": "2026-03-18T14:00:00.000Z",
       "description": "Cash sale",
       "amount": 50,
       "value": 3000
@@ -36,7 +35,7 @@
     {
       "id": "5",
       "type": "delivery",
-      "date": "2024-07-25T10:00:00.000Z",
+      "date": "2026-03-19T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 48,
       "value": -1680
@@ -44,7 +43,7 @@
     {
       "id": "6",
       "type": "sale",
-      "date": "2024-07-25T14:00:00.000Z",
+      "date": "2026-03-19T14:00:00.000Z",
       "description": "Credit to P. Jones",
       "amount": 20,
       "value": 1300
@@ -52,7 +51,7 @@
     {
       "id": "7",
       "type": "delivery",
-      "date": "2024-07-26T10:00:00.000Z",
+      "date": "2026-03-20T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 55,
       "value": -1925
@@ -60,7 +59,7 @@
     {
       "id": "8",
       "type": "sale",
-      "date": "2024-07-26T14:00:00.000Z",
+      "date": "2026-03-20T14:00:00.000Z",
       "description": "Cash sale",
       "amount": 55,
       "value": 3300
@@ -68,7 +67,7 @@
     {
       "id": "9",
       "type": "delivery",
-      "date": "2024-07-27T10:00:00.000Z",
+      "date": "2026-03-21T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 50,
       "value": -1750
@@ -76,7 +75,7 @@
     {
       "id": "10",
       "type": "sale",
-      "date": "2024-07-27T14:00:00.000Z",
+      "date": "2026-03-21T14:00:00.000Z",
       "description": "Credit to J. Smith",
       "amount": 5,
       "value": 325
@@ -84,7 +83,7 @@
     {
       "id": "11",
       "type": "payment",
-      "date": "2024-07-27T16:00:00.000Z",
+      "date": "2026-03-21T16:00:00.000Z",
       "description": "Payment for 100L",
       "amount": 100,
       "value": -3500
@@ -92,7 +91,7 @@
     {
       "id": "12",
       "type": "delivery",
-      "date": "2024-07-28T10:00:00.000Z",
+      "date": "2026-03-22T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 60,
       "value": -2100
@@ -100,7 +99,7 @@
     {
       "id": "13",
       "type": "sale",
-      "date": "2024-07-28T14:00:00.000Z",
+      "date": "2026-03-22T14:00:00.000Z",
       "description": "Cash sale",
       "amount": 58,
       "value": 3480
@@ -108,7 +107,7 @@
     {
       "id": "14",
       "type": "delivery",
-      "date": "2024-07-29T10:00:00.000Z",
+      "date": "2026-03-23T10:00:00.000Z",
       "description": "Milk delivery",
       "amount": 55,
       "value": -1925
@@ -116,10 +115,18 @@
     {
       "id": "15",
       "type": "sale",
-      "date": "2024-07-29T14:00:00.000Z",
+      "date": "2026-03-23T14:00:00.000Z",
       "description": "Credit to John Doe",
       "amount": 10,
       "value": 650
+    },
+    {
+      "id": "tx_purchase_1774266323909",
+      "type": "purchase",
+      "date": "2026-03-23T11:45:23.909Z",
+      "description": "Morning Intake: 200L",
+      "amount": 200,
+      "value": -1010000
     }
   ],
   "creditSales": [
@@ -129,8 +136,8 @@
       "liters": 10,
       "pricePerLiter": 65,
       "amountOwed": 650,
-      "saleDate": "2024-07-29T12:00:00.000Z",
-      "expectedPaymentDate": "2024-08-05T12:00:00.000Z",
+      "saleDate": "2026-03-23T12:00:00.000Z",
+      "expectedPaymentDate": "2026-03-30T12:00:00.000Z",
       "status": "outstanding"
     },
     {
@@ -139,8 +146,8 @@
       "liters": 5,
       "pricePerLiter": 65,
       "amountOwed": 325,
-      "saleDate": "2024-07-27T12:00:00.000Z",
-      "expectedPaymentDate": "2024-08-03T12:00:00.000Z",
+      "saleDate": "2026-03-21T12:00:00.000Z",
+      "expectedPaymentDate": "2026-03-28T12:00:00.000Z",
       "status": "outstanding"
     },
     {
@@ -149,9 +156,49 @@
       "liters": 20,
       "pricePerLiter": 65,
       "amountOwed": 1300,
-      "saleDate": "2024-07-25T12:00:00.000Z",
-      "expectedPaymentDate": "2024-08-01T12:00:00.000Z",
+      "saleDate": "2026-03-19T12:00:00.000Z",
+      "expectedPaymentDate": "2026-03-26T12:00:00.000Z",
       "status": "outstanding"
+    }
+  ],
+  "customers": [
+    {
+      "id": "c1",
+      "name": "John Doe",
+      "phone": "0700 123 456",
+      "address": "Nairobi CBD",
+      "balance": 0
+    },
+    {
+      "id": "c2",
+      "name": "Jane Smith",
+      "phone": "0722 123 456",
+      "address": "Westlands",
+      "balance": 500
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub1",
+      "customerId": "c1",
+      "dailyLiters": 2,
+      "pricePerLiter": 70,
+      "startDate": "2026-03-14T08:00:00.000Z",
+      "status": "active"
+    }
+  ],
+  "stock": [
+    {
+      "id": "stk1",
+      "date": "2026-03-23T10:00:00.000Z",
+      "intakeLiters": 400,
+      "spoiledLiters": 2
+    },
+    {
+      "id": "stk_1774266323909",
+      "date": "2026-03-23T11:45:23.909Z",
+      "intakeLiters": 200,
+      "spoiledLiters": 0
     }
   ]
 }
