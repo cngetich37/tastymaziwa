@@ -1,0 +1,61 @@
+/**
+ * Database connection. Uses Postgres when DATABASE_URL is set, otherwise an
+ * embedded PGlite store on disk (local development; zero setup).
+ *
+ * This module has no `server-only` guard so that CLI scripts and tests can use
+ * it; app code should import from `@/db` instead.
+ */
+import path from 'node:path';
+import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import * as schema from './schema';
+
+export type DB = PgDatabase<PgQueryResultHKT, typeof schema>;
+/** A DB handle or an open transaction; services accept either. */
+export type Tx = Parameters<Parameters<DB['transaction']>[0]>[0] | DB;
+
+const MIGRATIONS_DIR = path.resolve(/*turbopackIgnore: true*/ process.cwd(), 'drizzle');
+
+export async function createDb(options: { url?: string; pgliteDir?: string } = {}): Promise<{
+  db: DB;
+  close: () => Promise<void>;
+}> {
+  const url = options.url ?? process.env.DATABASE_URL;
+  if (url) {
+    const { default: postgres } = await import('postgres');
+    const { drizzle } = await import('drizzle-orm/postgres-js');
+    const client = postgres(url, { max: 10 });
+    return {
+      db: drizzle(client, { schema }) as unknown as DB,
+      close: () => client.end(),
+    };
+  }
+
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { drizzle } = await import('drizzle-orm/pglite');
+  // "memory://" gives a throwaway in-memory database (used by tests).
+  const dir = options.pgliteDir ?? process.env.PGLITE_DIR ?? './.data/pglite';
+  let client: InstanceType<typeof PGlite>;
+  if (dir === 'memory://') {
+    client = new PGlite();
+  } else {
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(path.resolve(/*turbopackIgnore: true*/ dir), { recursive: true });
+    client = new PGlite(path.resolve(/*turbopackIgnore: true*/ dir));
+  }
+  return {
+    db: drizzle(client, { schema }) as unknown as DB,
+    close: () => client.close(),
+  };
+}
+
+export async function migrateDb(db: DB): Promise<void> {
+  if (process.env.DATABASE_URL) {
+    const { migrate } = await import('drizzle-orm/postgres-js/migrator');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver-specific handle
+    await migrate(db as any, { migrationsFolder: MIGRATIONS_DIR });
+  } else {
+    const { migrate } = await import('drizzle-orm/pglite/migrator');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- driver-specific handle
+    await migrate(db as any, { migrationsFolder: MIGRATIONS_DIR });
+  }
+}
