@@ -137,14 +137,10 @@ scripts/                  # seed, migrate
    | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Your mail provider's SMTP settings (e.g. Gmail with an app password, Zoho, Brevo). Required: sign-up and sign-in codes are emailed. |
    | `APP_URL` | Optional. Your custom domain, used in email links. Defaults to the Vercel production URL. |
 
-3. **Migrate** production from your machine:
-   ```bash
-   DATABASE_URL="<production url>" npm run db:migrate
-   ```
-   No seeding is needed: open the site and sign up to create your shop.
-4. **Push to `master`** and Vercel deploys. `vercel.json` schedules subscription billing every day at **06:00 Nairobi time** (03:00 UTC).
+3. **Push to `master`** and Vercel deploys. Production deploys apply database migrations automatically before building (`npm run vercel-build`); Preview deploys never touch the production database. If a migration fails, the deploy fails and the previous version keeps running.
+4. **Open the site and sign up** to create your shop. No seeding is needed. `vercel.json` also schedules subscription billing every day at **06:00 Nairobi time** (03:00 UTC).
 
-Migrations don't run during the build. After a schema change lands on `master`, run `npm run db:migrate` against production.
+To migrate by hand instead (e.g. before the first deploy), run `DATABASE_URL="<url>" npm run db:migrate` from your machine.
 
 ## Contributing
 

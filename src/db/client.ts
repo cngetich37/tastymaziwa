@@ -29,11 +29,21 @@ export async function createDb(options: { url?: string; pgliteDir?: string } = {
       max: process.env.VERCEL ? 1 : 10,
       // Transaction-mode poolers (Neon, Supabase) don't support prepared statements.
       prepare: false,
+      // Informational notices ("already exists, skipping") just clutter logs.
+      onnotice: () => {},
     });
     return {
       db: drizzle(client, { schema }) as unknown as DB,
       close: () => client.end(),
     };
+  }
+
+  // Vercel has no persistent disk: never silently fall back to a local database there.
+  if (process.env.VERCEL) {
+    throw new Error(
+      'DATABASE_URL is not set. On Vercel, set it to a hosted Postgres connection string ' +
+        '(Settings → Environment Variables), then redeploy.',
+    );
   }
 
   const { PGlite } = await import('@electric-sql/pglite');

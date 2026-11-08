@@ -181,12 +181,13 @@ The database enforces these rules. Don't work around them:
 
 - Every push to a branch gets a Preview deployment; merging to `master` deploys Production.
 - Set these as Vercel project environment variables:
-  - `DATABASE_URL` (required). Vercel has no persistent disk, so the PGlite fallback can't run there. Use the provider's **pooled** connection string (Neon/Supabase). The client already uses a pool of 1 and `prepare: false` on Vercel.
+  - `DATABASE_URL` (required). Vercel has no persistent disk, so on Vercel the app refuses to start without it rather than falling back to PGlite. Use the provider's **pooled** connection string (Neon/Supabase). The client already uses a pool of 1 and `prepare: false` on Vercel.
+  - `DATABASE_URL_UNPOOLED` (optional, recommended): a direct connection used only for migrations at deploy time. Neon's Vercel integration sets it automatically.
   - `AUTH_SECRET` (required).
   - `CRON_SECRET` (required for billing). Vercel Cron sends it automatically as `Authorization: Bearer …`.
   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` (required: sign-up, codes and resets all need email). Optional `APP_URL` for a custom domain.
 - Point Preview at a separate database or Neon branch, never Production's.
-- **Migrations are not run during the build.** After merging a schema change, run `DATABASE_URL=<prod> npm run db:migrate` before (or immediately after) the deploy. No seeding is needed in production: shops are created by signing up.
+- **Production deploys migrate the database automatically.** `vercel.json` sets the build command to `npm run vercel-build`, which runs `scripts/migrate-on-deploy.mts` and then `next build`. It applies pending migrations only when `VERCEL_ENV=production` (Preview builds skip it, so they can't touch the live database), prefers `DATABASE_URL_UNPOOLED`/`DIRECT_URL` over the pooled URL, and a failed migration fails the deploy so the previous version keeps serving. Because the new schema goes live a minute or two before the new code, **migrations must stay backward-compatible with the running code**: add columns/tables first, drop or rename only in a later deploy. `npm run db:migrate` still works manually. No seeding is needed in production: shops are created by signing up.
 - `vercel.json` cron: `/api/cron/bill-subscriptions` runs at `0 3 * * *` UTC, which is 06:00 Nairobi. Vercel Hobby can fire anywhere within that hour; billing is idempotent, so retries and duplicates are harmless.
 - Auth.js trusts the host automatically on Vercel; `AUTH_TRUST_HOST` is only for other hosts.
 
