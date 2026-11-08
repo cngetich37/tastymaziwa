@@ -106,3 +106,46 @@ test('an invited attendant sets a password and cannot open settings', async ({ p
   await page.goto('/settings');
   await expect(page).toHaveURL(/\/$/);
 });
+
+test('owner resends an invite and promotes a team member to owner', async ({ page }) => {
+  const email = uniqueEmail('promote');
+  await signIn(page, E2E_OWNER.email, E2E_OWNER.password);
+  await page.goto('/settings');
+  await page.getByRole('button', { name: 'Invite' }).click();
+  await page.getByLabel('Full name').fill('Rising Star');
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByRole('button', { name: 'Send invite' }).click();
+  await expect(page.getByText(email)).toBeVisible();
+  const firstLink = linkFrom(await waitForMail(email));
+
+  // Resend from the member's menu: a new email arrives.
+  await page.getByRole('button', { name: 'Actions for Rising Star' }).click();
+  await page.getByRole('menuitem', { name: 'Resend invite' }).click();
+  await expect(page.getByText('Invite sent again to Rising Star').first()).toBeVisible();
+  const secondLink = linkFrom(await waitForMail(email, { after: 1 }));
+  expect(secondLink).not.toBe(firstLink);
+
+  // Promote to owner (confirm dialog accepted).
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Actions for Rising Star' }).click();
+  await page.getByRole('menuitem', { name: 'Make owner' }).click();
+  await expect(page.getByText('Rising Star is now an owner').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/login/);
+
+  // The first link no longer works; the resent one does.
+  await page.goto(firstLink);
+  await expect(page.getByRole('heading', { name: 'This link has expired' })).toBeVisible();
+  await page.goto(secondLink);
+  await formReady(page, 'Save password');
+  await page.getByLabel('New password', { exact: true }).fill('rising-star-password');
+  await page.getByLabel('Confirm new password').fill('rising-star-password');
+  await page.getByRole('button', { name: 'Save password' }).click();
+  await expect(page).toHaveURL(/\/login\?reset=1/);
+
+  // As an owner they can open Settings and see profit.
+  await signIn(page, email, 'rising-star-password');
+  await expect(page.getByText('Net profit today')).toBeVisible();
+  await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+});

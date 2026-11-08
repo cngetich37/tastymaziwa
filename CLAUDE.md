@@ -98,7 +98,7 @@ scripts/              seed, migrate (run with tsx)
 | Sign up | `/signup`: shop name, name, email, password, then a 6-digit code is emailed. Entering it creates the **shop + owner** and signs in (`email-code` provider, `intent: 'signup'`). The pending account lives only in `auth_tokens.data` until verified. |
 | Sign in | Password (`password` provider) **or** passwordless: email, then a 6-digit code, then the `email-code` provider. |
 | Forgot password | `/forgot-password` sends a single-use link (30 min) to `/reset-password?token=...`. Resetting bumps `session_version`, so every other session ends. |
-| Staff | Owners invite by email from Settings; the invite is a 72 h set-password link, and invitees can also sign in with a code straight away. Owners can deactivate staff. |
+| Staff | Owners invite by email from Settings; the invite is a 72 h set-password link, and invitees can also sign in with a code straight away. From each member's menu, owners can resend a pending invite (the old link dies), switch the role between attendant and owner (never their own, so a shop always keeps an owner; live sessions pick it up at the next 5-minute re-check), and deactivate or reactivate. |
 | Account | `/account`: change name, email (confirmed by a code to the new address) and password (signs out other devices). |
 | Sessions | JWT cookie; **30 min idle** timeout (each request slides it), **12 h hard limit**, user row re-checked every 5 min (deactivated or password changed: signed out). `SessionTimeout` mirrors the idle timer in the browser and signs the tab out. All configurable via `SESSION_*` env vars. |
 

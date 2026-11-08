@@ -277,6 +277,13 @@ export const userActiveSchema = z.object({
   active: z.boolean(),
 });
 
+export const userRoleSchema = z.object({
+  userId: id,
+  role: z.enum(['owner', 'attendant']),
+});
+
+export const resendInviteSchema = z.object({ userId: id });
+
 export type SaleInput = z.output<typeof saleSchema>;
 export type DeliveryInput = z.output<typeof deliverySchema>;
 export type CustomerPaymentInput = z.output<typeof customerPaymentSchema>;

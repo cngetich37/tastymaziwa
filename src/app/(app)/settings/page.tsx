@@ -1,5 +1,5 @@
 import { AddSupplierButton, InviteStaffButton } from '@/components/dialog-buttons';
-import { ShopNameForm, UserActiveToggle } from '@/components/forms/account-forms';
+import { ShopNameForm, TeamMemberMenu } from '@/components/forms/account-forms';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDb } from '@/db';
@@ -81,22 +81,27 @@ export default async function SettingsPage() {
               {users.map((u) => {
                 const invited = !u.hasPassword && !u.emailVerifiedAt;
                 return (
-                  <li key={u.id} className="flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <p className="font-medium">
+                  <li key={u.id} className="flex items-start gap-3 py-3">
+                    {/* Badges sit under the name so the row never overflows on a phone. */}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">
                         {u.name}
                         {u.id === me.id && <span className="text-muted-foreground"> (you)</span>}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        <Badge variant={u.role === 'owner' ? 'default' : 'outline'} className="capitalize">
+                          {u.role}
+                        </Badge>
+                        {u.active && invited && <Badge variant="outline">Invited</Badge>}
+                        {!u.active && <Badge variant="secondary">Deactivated</Badge>}
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      {!u.active && <Badge variant="secondary">Deactivated</Badge>}
-                      {u.active && invited && <Badge variant="outline">Invited</Badge>}
-                      <Badge variant={u.role === 'owner' ? 'default' : 'outline'} className="capitalize">
-                        {u.role}
-                      </Badge>
-                      {u.id !== me.id && <UserActiveToggle userId={u.id} active={u.active} name={u.name} />}
-                    </div>
+                    {u.id !== me.id && (
+                      <div className="shrink-0">
+                        <TeamMemberMenu member={{ id: u.id, name: u.name, role: u.role, active: u.active, invited }} />
+                      </div>
+                    )}
                   </li>
                 );
               })}

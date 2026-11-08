@@ -30,7 +30,7 @@
 | **Your own shop in a minute** | Sign up with your shop name and email. Every shop's books are completely private, and the database itself refuses cross-shop references. |
 | **Sign in your way** | With a password, or passwordless with a 6-digit code sent to your email. Forgot your password? Reset it with an emailed link. |
 | **Locks itself** | After 30 minutes without activity (and always after a 12-hour shift) you're signed out, so an unattended phone doesn't show your books. |
-| **Owner and attendant roles** | Invite staff by email. Attendants record sales, deliveries and payments. Owners also see profit, record expenses, reverse entries, and manage or deactivate the team. |
+| **Owner and attendant roles** | Invite staff by email. Attendants record sales, deliveries and payments. Owners also see profit, record expenses, reverse entries, and manage the team: change roles, resend invites, deactivate. |
 | **Audit trail** | Every change records who made it and when. |
 
 ## Quick start

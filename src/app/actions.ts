@@ -20,7 +20,9 @@ import {
   profileSchema,
   requestEmailChangeSchema,
   shopSchema,
+  resendInviteSchema,
   userActiveSchema,
+  userRoleSchema,
   reverseEntrySchema,
   saleSchema,
   spoilageSchema,
@@ -134,4 +136,12 @@ export const inviteStaffAction = defineAction({ schema: inviteStaffSchema, roles
 
 export const setUserActiveAction = defineAction({ schema: userActiveSchema, roles: OWNER }, ({ db, actor }, input) =>
   accounts.setUserActive(db, actor, input.userId, input.active).then(() => null),
+);
+
+export const setUserRoleAction = defineAction({ schema: userRoleSchema, roles: OWNER }, ({ db, actor }, input) =>
+  accounts.setUserRole(db, actor, input.userId, input.role).then(() => null),
+);
+
+export const resendInviteAction = defineAction({ schema: resendInviteSchema, roles: OWNER }, ({ db, actor, ip }, input) =>
+  accounts.resendInvite(db, actor, input.userId, ip).then(() => null),
 );

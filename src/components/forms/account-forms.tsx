@@ -10,9 +10,20 @@ import {
   confirmEmailChangeAction,
   renameShopAction,
   requestEmailChangeAction,
+  resendInviteAction,
   setUserActiveAction,
+  setUserRoleAction,
   updateProfileAction,
 } from '@/app/actions';
+import { Loader2, MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { toast } from '@/hooks/use-toast';
@@ -150,27 +161,73 @@ export function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
   );
 }
 
-export function UserActiveToggle({ userId, active, name }: { userId: string; active: boolean; name: string }) {
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: 'owner' | 'attendant';
+  active: boolean;
+  invited: boolean;
+}
+
+/** Per-member actions for owners: role, resend invite, (de)activate. */
+export function TeamMemberMenu({ member }: { member: TeamMember }) {
   const [pending, startTransition] = useTransition();
+
+  const run = (fn: () => Promise<{ ok: true } | { ok: false; error: string }>, success: string) =>
+    startTransition(async () => {
+      const result = await fn();
+      toast(result.ok ? { title: success } : { variant: 'destructive', title: 'Not changed', description: result.error });
+    });
+
+  const nextRole = member.role === 'owner' ? 'attendant' : 'owner';
+
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      className={active ? 'h-8 px-2 text-xs text-red-600 dark:text-red-400' : 'h-8 px-2 text-xs'}
-      disabled={pending}
-      onClick={() =>
-        startTransition(async () => {
-          if (active && !confirm(`Deactivate ${name}? They'll be signed out and can't sign in again.`)) return;
-          const result = await setUserActiveAction({ userId, active: !active });
-          toast(
-            result.ok
-              ? { title: active ? `${name} deactivated` : `${name} reactivated` }
-              : { variant: 'destructive', title: 'Not changed', description: result.error },
-          );
-        })
-      }
-    >
-      {active ? 'Deactivate' : 'Reactivate'}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-9 w-9" disabled={pending} aria-label={`Actions for ${member.name}`}>
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate">{member.name}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {member.active && (
+          <DropdownMenuItem
+            onSelect={() => {
+              if (
+                nextRole === 'owner' &&
+                !confirm(`Make ${member.name} an owner? They'll see profit, reverse entries and manage the team.`)
+              )
+                return;
+              run(
+                () => setUserRoleAction({ userId: member.id, role: nextRole }),
+                `${member.name} is now ${nextRole === 'owner' ? 'an owner' : 'an attendant'}`,
+              );
+            }}
+          >
+            {nextRole === 'owner' ? 'Make owner' : 'Make attendant'}
+          </DropdownMenuItem>
+        )}
+        {member.active && member.invited && (
+          <DropdownMenuItem
+            onSelect={() => run(() => resendInviteAction({ userId: member.id }), `Invite sent again to ${member.name}`)}
+          >
+            Resend invite
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem
+          className={member.active ? 'text-red-600 focus:text-red-600 dark:text-red-400' : undefined}
+          onSelect={() => {
+            if (member.active && !confirm(`Deactivate ${member.name}? They'll be signed out and can't sign in again.`)) return;
+            run(
+              () => setUserActiveAction({ userId: member.id, active: !member.active }),
+              member.active ? `${member.name} deactivated` : `${member.name} reactivated`,
+            );
+          }}
+        >
+          {member.active ? 'Deactivate' : 'Reactivate'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

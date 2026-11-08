@@ -360,6 +360,82 @@ export async function inviteStaff(db: DB, actor: Actor, input: InviteStaffInput)
   return user;
 }
 
+/**
+ * Switch a team member between attendant and owner. You can't change your
+ * own role, so a shop always keeps at least one owner (the actor). Live
+ * sessions pick up the new role at their next re-check (within 5 minutes).
+ */
+export async function setUserRole(db: DB, actor: Actor, userId: string, role: Role): Promise<void> {
+  if (userId === actor.id) throw new DomainError("You can't change your own role");
+  await db.transaction(async (tx) => {
+    const [target] = await tx
+      .select({ role: users.role })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.shopId, actor.shopId)));
+    if (!target) throw new DomainError('User not found');
+    if (target.role === role) return;
+    await tx.update(users).set({ role }).where(eq(users.id, userId));
+    await tx.insert(auditLog).values({
+      shopId: actor.shopId,
+      userId: actor.id,
+      action: 'user.role_change',
+      entityType: 'user',
+      entityId: userId,
+      data: { from: target.role, to: role },
+    });
+  });
+}
+
+/**
+ * Email a fresh set-password link to someone who hasn't accepted their invite
+ * yet. Any previous link stops working. Counts against the email rate limits.
+ */
+export async function resendInvite(db: DB, actor: Actor, userId: string, ip: string): Promise<void> {
+  const [target] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      active: users.active,
+      passwordHash: users.passwordHash,
+      emailVerifiedAt: users.emailVerifiedAt,
+    })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.shopId, actor.shopId)));
+  if (!target) throw new DomainError('User not found');
+  if (!target.active) throw new DomainError('Reactivate this person before resending their invite');
+  if (target.passwordHash || target.emailVerifiedAt) {
+    throw new DomainError('They have already joined. They can use "Forgot password?" if they need a new one.');
+  }
+  if (!(await consume(db, limits.sendEmail(target.email, ip)))) {
+    throw new DomainError('Too many emails to this address. Please wait a few minutes and try again.');
+  }
+
+  const token = generateLinkToken();
+  const { shopName, inviterName } = await db.transaction(async (tx) => {
+    // Supersedes the earlier invite link for this address.
+    await issueToken(tx, {
+      purpose: 'password_reset',
+      email: target.email,
+      userId: target.id,
+      secret: token,
+      ttlSeconds: authConfig.inviteTtlSeconds,
+      data: { invite: true },
+    });
+    await tx.insert(auditLog).values({
+      shopId: actor.shopId,
+      userId: actor.id,
+      action: 'user.invite_resend',
+      entityType: 'user',
+      entityId: target.id,
+    });
+    const [shop] = await tx.select({ name: shops.name }).from(shops).where(eq(shops.id, actor.shopId));
+    const [inviter] = await tx.select({ name: users.name }).from(users).where(eq(users.id, actor.id!));
+    return { shopName: shop.name, inviterName: inviter?.name ?? 'Your shop owner' };
+  });
+  const url = `${appUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+  await sendEmail(emails.inviteEmail(target.email, inviterName, shopName, url, authConfig.inviteTtlSeconds / 3600));
+}
+
 export async function setUserActive(db: DB, actor: Actor, userId: string, active: boolean): Promise<void> {
   if (userId === actor.id) throw new DomainError("You can't deactivate your own account");
   await db.transaction(async (tx) => {

@@ -21,8 +21,10 @@ import {
   requestLoginCode,
   requestPasswordReset,
   requestSignup,
+  resendInvite,
   resetPassword,
   setUserActive,
+  setUserRole,
   verifyLoginCode,
   type AuthUser,
 } from './accounts';
@@ -257,4 +259,68 @@ describe('team management', () => {
     const ownerB = await signUp('owner-b@team.test');
     await expect(setUserActive(db, actorOf(ownerA), ownerB.id, false)).rejects.toBeInstanceOf(DomainError);
   });
+
+  it('changes roles within the shop; the session picks up the new role', async () => {
+    const owner = await signUp('roles-owner@team.test');
+    await inviteStaff(db, actorOf(owner), { name: 'Promoted', email: 'promoted@team.test', role: 'attendant' });
+    const staff = (await getSessionState(db, (await db.select().from(users).where(eq(users.email, 'promoted@team.test')))[0].id))!;
+    expect(staff.role).toBe('attendant');
+
+    await setUserRole(db, actorOf(owner), staff.id, 'owner');
+    // Same session version (no sign-out); the jwt re-check reads the new role.
+    expect(await getSessionState(db, staff.id)).toMatchObject({ role: 'owner', sessionVersion: staff.sessionVersion });
+
+    await setUserRole(db, actorOf(owner), staff.id, 'attendant');
+    expect((await getSessionState(db, staff.id))?.role).toBe('attendant');
+  });
+
+  it("won't let you change your own role (a shop always keeps an owner)", async () => {
+    const owner = await signUp('solo-owner@team.test');
+    await expect(setUserRole(db, actorOf(owner), owner.id, 'attendant')).rejects.toBeInstanceOf(DomainError);
+    expect((await getSessionState(db, owner.id))?.role).toBe('owner');
+  });
+
+  it("can't change roles in another shop", async () => {
+    const ownerA = await signUp('role-a@team.test');
+    const ownerB = await signUp('role-b@team.test');
+    await expect(setUserRole(db, actorOf(ownerA), ownerB.id, 'attendant')).rejects.toBeInstanceOf(DomainError);
+    expect((await getSessionState(db, ownerB.id))?.role).toBe('owner');
+  });
+
+  it('resends an invite with a fresh link; the old link stops working', async () => {
+    const owner = await signUp('resend-owner@team.test');
+    const invited = await inviteStaff(db, actorOf(owner), { name: 'Slow', email: 'slow@team.test', role: 'attendant' });
+    const firstLink = tokenIn(lastMail('slow@team.test'));
+
+    await resendInvite(db, actorOf(owner), invited.id, ip());
+    const resent = lastMail('slow@team.test');
+    expect(resent?.subject).toMatch(/added you/i);
+    const secondLink = tokenIn(resent);
+    expect(secondLink).not.toBe(firstLink);
+
+    expect(await resetPassword(db, firstLink, 'too-late-password')).toBeNull();
+    expect(await resetPassword(db, secondLink, 'joined-password-1')).toEqual({ email: 'slow@team.test' });
+  });
+
+  it("won't resend to someone who has already joined, or in another shop", async () => {
+    const owner = await signUp('resend-guard@team.test');
+    const joined = await inviteStaff(db, actorOf(owner), { name: 'Joined', email: 'joined@team.test', role: 'attendant' });
+    await resetPassword(db, tokenIn(lastMail('joined@team.test')), 'already-set-password');
+    await expect(resendInvite(db, actorOf(owner), joined.id, ip())).rejects.toBeInstanceOf(DomainError);
+
+    const other = await signUp('resend-other@team.test');
+    const pendingElsewhere = await inviteStaff(db, actorOf(other), { name: 'X', email: 'x-pending@team.test', role: 'attendant' });
+    await expect(resendInvite(db, actorOf(owner), pendingElsewhere.id, ip())).rejects.toBeInstanceOf(DomainError);
+  });
+
+  it('rate-limits resends to the same address', async () => {
+    const owner = await signUp('resend-spam@team.test');
+    const invited = await inviteStaff(db, actorOf(owner), { name: 'Spam', email: 'spam-invite@team.test', role: 'attendant' });
+    const results: boolean[] = [];
+    for (let i = 0; i < 4; i++) {
+      results.push(await resendInvite(db, actorOf(owner), invited.id, ip()).then(() => true, () => false));
+    }
+    expect(results).toEqual([true, true, true, false]);
+  });
 });
+
