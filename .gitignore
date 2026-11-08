@@ -43,3 +43,12 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+# local database
+/.data/
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+!.env.example
