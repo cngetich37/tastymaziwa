@@ -10,7 +10,7 @@ import { todayBusinessDate } from './dates';
 
 function scaledField(parse: (s: string) => number, label: string, opts: { allowZero?: boolean }) {
   return z
-    .string({ required_error: `${label} is required` })
+    .string({ error: `${label} is required` })
     .trim()
     .min(1, `${label} is required`)
     .transform((value, ctx) => {
@@ -18,12 +18,12 @@ function scaledField(parse: (s: string) => number, label: string, opts: { allowZ
       try {
         n = parse(value);
       } catch {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Enter a valid ${label.toLowerCase()}` });
+        ctx.addIssue({ code: 'custom', message: `Enter a valid ${label.toLowerCase()}` });
         return z.NEVER;
       }
       if (n < 0 || (!opts.allowZero && n === 0)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: `${label} must be ${opts.allowZero ? 'zero or more' : 'more than zero'}`,
         });
         return z.NEVER;
@@ -40,25 +40,30 @@ export const kesFieldAllowZero = (label = 'Amount') =>
 /** Litres string → integer millilitres (> 0) */
 export const litresField = (label = 'Litres') => scaledField(litresToMl, label, {});
 
-const optionalText = (max = 500) =>
-  z
+/**
+ * An optional form field: missing or blank ('' / whitespace) becomes
+ * `undefined`; anything else must pass `inner`. `.optional()` is outermost so
+ * the key is optional in both the input and output types (zod 4 makes a key
+ * required if a transform wraps the optional).
+ */
+function optionalField<T extends z.ZodType<unknown, string>>(inner: T) {
+  return z
     .string()
-    .trim()
-    .max(max)
-    .optional()
-    .transform((v) => (v ? v : undefined));
+    .transform((v) => (v.trim() === '' ? undefined : v))
+    .pipe(inner.optional())
+    .optional();
+}
+
+const optionalText = (max = 500) => optionalField(z.string().trim().max(max));
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
 
 /** Optional business date, defaults to today (Nairobi), never in the future. */
-const entryDate = z
-  .string()
-  .optional()
-  .transform((v) => (v ? v : undefined))
-  .pipe(isoDate.optional())
-  .refine((v) => !v || v <= todayBusinessDate(), 'Date cannot be in the future');
+const entryDate = optionalField(
+  isoDate.refine((v) => v <= todayBusinessDate(), 'Date cannot be in the future'),
+);
 
-const id = z.string().uuid('Choose an option');
+const id = z.uuid({ error: 'Choose an option' });
 
 /**
  * Normalise Kenyan mobile numbers to E.164: 0712 345 678, 712345678,
@@ -70,19 +75,16 @@ export function normalizeKenyanPhone(input: string): string | null {
   return match ? `+254${match[1]}` : null;
 }
 
-const phoneField = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value, ctx) => {
-    if (!value) return undefined;
+const phoneField = optionalField(
+  z.string().transform((value, ctx) => {
     const normalized = normalizeKenyanPhone(value);
     if (!normalized) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a Kenyan mobile number, e.g. 0712 345 678' });
+      ctx.addIssue({ code: 'custom', message: 'Enter a Kenyan mobile number, e.g. 0712 345 678' });
       return z.NEVER;
     }
     return normalized;
-  });
+  }),
+);
 
 // --- enums ------------------------------------------------------------------
 
@@ -108,21 +110,13 @@ export const saleSchema = z
     litres: litresField(),
     pricePerLitre: kesField('Price per litre'),
     paymentMethod: z.enum(PAYMENT_METHODS),
-    customerId: z
-      .string()
-      .optional()
-      .transform((v) => (v ? v : undefined))
-      .pipe(id.optional()),
-    dueDate: z
-      .string()
-      .optional()
-      .transform((v) => (v ? v : undefined))
-      .pipe(isoDate.optional()),
+    customerId: optionalField(id),
+    dueDate: optionalField(isoDate),
     date: entryDate,
     note: optionalText(),
   })
   .refine((v) => v.paymentMethod !== 'credit' || v.customerId, {
-    message: 'Choose who is buying on credit',
+    error: 'Choose who is buying on credit',
     path: ['customerId'],
   });
 
@@ -180,11 +174,7 @@ export const customerSchema = z.object({
 export const supplierSchema = z.object({
   name: z.string().trim().min(2, 'Name is required').max(120),
   phone: phoneField,
-  defaultPricePerLitre: z
-    .string()
-    .optional()
-    .transform((v) => (v ? v : undefined))
-    .pipe(kesFieldAllowZero('Default price').optional()),
+  defaultPricePerLitre: optionalField(kesFieldAllowZero('Default price')),
 });
 
 export const subscriptionSchema = z.object({

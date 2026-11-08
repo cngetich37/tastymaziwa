@@ -39,7 +39,7 @@ npm run user:create -- <username> <owner|attendant> "Full Name"
 - **Tailwind CSS v4** (CSS-first config in `src/app/globals.css`, using `@theme` and `tw-animate-css`), with shadcn/ui primitives in `src/components/ui`. That folder is generated code: change it with the shadcn CLI, don't hand-edit it. Lint skips it.
 - **PostgreSQL + Drizzle ORM.** Locally it runs on embedded **PGlite** (Postgres in WASM) in `.data/pglite`, so there's nothing to install. With `DATABASE_URL` set it uses hosted Postgres through `postgres-js`.
 - **Auth.js (next-auth v5)** with a Credentials provider against the `users` table, scrypt password hashes and JWT sessions (12h). Roles are `owner` and `attendant`.
-- **Zod 3** schemas shared by the forms (react-hook-form) and the server actions.
+- **Zod 4** schemas shared by the forms (react-hook-form) and the server actions.
 - **Vitest** + **Playwright**, with CI in `.github/workflows/ci.yml`.
 - **Vercel** hosting, with Vercel Cron in `vercel.json` (see *Deployment* below).
 - No AI SDK is installed yet. Add one when the first AI feature on the roadmap starts.
@@ -124,6 +124,7 @@ The database enforces these rules. Don't work around them:
 - Each form uses `useActionForm(schema, action, defaults, { success })` with the field components in `components/forms/fields.tsx`. Inputs are strings: the client validates for instant feedback, and the server parses the raw strings again.
 - Money and litre inputs use `kind="money"` / `kind="litres"` (`inputMode="decimal"`, never `type="number"`).
 - Phone numbers are normalised to E.164 (`+2547…`) by the Zod schema.
+- Wrap optional inputs in `optionalField(inner)` (in `lib/validation.ts`). In zod 4 a `.transform()` around `.optional()` makes the key *required*, so `.optional()` must stay outermost. Use `{ error: '…' }` for messages (not `message` / `required_error`) and `z.flattenError(err)` (not `err.flatten()`).
 
 ### Schema changes
 1. Edit `src/db/schema.ts`.

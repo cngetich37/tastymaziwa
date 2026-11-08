@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { customerSchema, normalizeKenyanPhone, saleSchema } from './validation';
 
 describe('normalizeKenyanPhone', () => {
@@ -27,7 +28,7 @@ describe('saleSchema', () => {
   it('requires a customer for credit sales', () => {
     const result = saleSchema.safeParse({ ...base, paymentMethod: 'credit' });
     expect(result.success).toBe(false);
-    expect(result.error?.flatten().fieldErrors.customerId).toBeDefined();
+    expect(z.flattenError(result.error!).fieldErrors.customerId).toBeDefined();
   });
 
   it('rejects zero, negative and malformed quantities', () => {
@@ -48,5 +49,36 @@ describe('customerSchema', () => {
       phone: '+254712345678',
       address: undefined,
     });
+  });
+});
+
+describe('optional fields (zod 4 semantics)', () => {
+  const base = { litres: '2', pricePerLitre: '70', paymentMethod: 'cash' };
+
+  it('accepts missing optional keys', () => {
+    expect(saleSchema.parse(base)).toEqual({
+      litres: 2000,
+      pricePerLitre: 7000,
+      paymentMethod: 'cash',
+    });
+  });
+
+  it('turns blank and whitespace-only strings into undefined', () => {
+    const parsed = saleSchema.parse({ ...base, note: '   ', date: '', customerId: '', dueDate: '' });
+    expect(parsed.note).toBeUndefined();
+    expect(parsed.date).toBeUndefined();
+    expect(parsed.customerId).toBeUndefined();
+  });
+
+  it('still validates optional fields that are filled in', () => {
+    expect(saleSchema.safeParse({ ...base, customerId: 'not-a-uuid' }).success).toBe(false);
+    expect(saleSchema.safeParse({ ...base, dueDate: '08/11/2026' }).success).toBe(false);
+    expect(customerSchema.safeParse({ name: 'Jane', phone: '12345' }).success).toBe(false);
+  });
+
+  it('keeps the custom "required" message for a missing amount', () => {
+    const result = saleSchema.safeParse({ pricePerLitre: '70', paymentMethod: 'cash' });
+    expect(result.success).toBe(false);
+    expect(z.flattenError(result.error!).fieldErrors.litres).toEqual(['Litres is required']);
   });
 });

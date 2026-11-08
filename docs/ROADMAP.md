@@ -23,7 +23,7 @@ Mark each item done with `[x]` as it ships.
 - [ ] Archive customers and suppliers from the UI. The `archived_at` columns already exist.
 - [ ] Rate-limit sign-in attempts.
 - [ ] Regenerate the remaining unused shadcn components with the current CLI, or delete them.
-- [ ] Migrate zod 3 → 4 (clears the last `npm audit` advisory; `required_error`, `ZodIssueCode` and `.flatten()` usage in `src/lib/validation.ts` and `src/server/action.ts` need updating).
+- [x] Migrate zod 3 → 4 (clears the last production `npm audit` advisory).
 
 ## P1: Core business features
 

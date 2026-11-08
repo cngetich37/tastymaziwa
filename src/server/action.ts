@@ -1,6 +1,6 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { getDb, type DB } from '@/db';
 import type { Role } from '@/db/schema';
 import { DomainError, type Actor } from './ledger';
@@ -14,7 +14,7 @@ export type { ActionResult } from '@/lib/action-result';
  * the raw input, error mapping and cache revalidation. Server actions are
  * public HTTP endpoints — this wrapper is what makes them safe.
  */
-export function defineAction<S extends z.ZodTypeAny, T>(
+export function defineAction<S extends z.ZodType, T>(
   options: { schema: S; roles: Role[] },
   handler: (ctx: { db: DB; actor: Actor }, input: z.output<S>) => Promise<T>,
 ) {
@@ -30,7 +30,7 @@ export function defineAction<S extends z.ZodTypeAny, T>(
       return {
         ok: false,
         error: 'Please fix the highlighted fields.',
-        fieldErrors: parsed.error.flatten().fieldErrors,
+        fieldErrors: z.flattenError(parsed.error).fieldErrors,
       };
     }
 

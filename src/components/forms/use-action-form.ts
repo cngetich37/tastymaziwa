@@ -16,14 +16,15 @@ interface Options<T> {
  * react-hook-form + Zod on the client for instant feedback, then the raw
  * string values go to the server action, which validates them again.
  */
-export function useActionForm<S extends z.ZodType<unknown, z.ZodTypeDef, FieldValues>, T>(
+export function useActionForm<S extends z.ZodType<FieldValues, FieldValues>, T>(
   schema: S,
   action: (raw: z.input<S>) => Promise<ActionResult<T>>,
   defaultValues: z.input<S>,
   options: Options<T>,
 ) {
   const form = useForm<z.input<S>, unknown, z.output<S>>({
-    resolver: zodResolver(schema),
+    // Explicit type arguments select the zod 4 overload for a generic schema.
+    resolver: zodResolver<FieldValues, unknown, FieldValues, S>(schema),
     defaultValues: defaultValues as DefaultValues<z.input<S>>,
   });
   const [pending, startTransition] = useTransition();
