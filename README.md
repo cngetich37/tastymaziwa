@@ -11,7 +11,7 @@ npm run db:seed -- --demo         # prints the owner password once
 npm run dev                       # http://localhost:9002
 ```
 
-No database server is needed locally: it runs on embedded Postgres (PGlite) in `.data/`. In production, set `DATABASE_URL` and run `npm run db:migrate`.
+No database server is needed locally: it runs on embedded Postgres (PGlite) in `.data/`. Deployed on Vercel. Set `DATABASE_URL`, `AUTH_SECRET` and `CRON_SECRET` on the project and run `npm run db:migrate` against the production database. Full notes are under *Deployment* in `CLAUDE.md`.
 
 ## Checks
 

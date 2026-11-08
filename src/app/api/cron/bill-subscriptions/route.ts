@@ -4,8 +4,9 @@ import { getDb } from '@/db';
 import { billSubscriptions, SYSTEM_ACTOR } from '@/server/ledger';
 
 /**
- * Daily subscription billing for a scheduler (Cloud Scheduler, Vercel Cron…).
- * Requires `Authorization: Bearer $CRON_SECRET`. Safe to call repeatedly:
+ * Daily subscription billing, triggered by Vercel Cron (see vercel.json).
+ * Requires `Authorization: Bearer $CRON_SECRET`, which Vercel sends automatically
+ * when CRON_SECRET is set on the project. Safe to call repeatedly:
  * each subscription is billed at most once per business day.
  */
 export async function GET(request: Request) {

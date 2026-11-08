@@ -51,7 +51,7 @@ Mark each item done with `[x]` as it ships.
 - [ ] **Low-stock and over-stock alerts** based on typical sales for that weekday.
 
 ### Subscriptions (standing orders)
-- [ ] **Idempotent daily billing**, run by a scheduled job (Cloud Scheduler or Vercel Cron) keyed by date.
+- [x] **Idempotent daily billing**, run daily at 06:00 Nairobi by Vercel Cron (`vercel.json`) and keyed by date.
 - [ ] **Pause and skip days.** For example, "Mama Wanjiku is away Monday–Wednesday."
 - [ ] **Delivery route list.** A printable or phone-friendly list of today's subscription deliveries, with tick-off as each one is delivered.
 

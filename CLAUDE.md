@@ -41,7 +41,7 @@ npm run user:create -- <username> <owner|attendant> "Full Name"
 - **Auth.js (next-auth v5)** with a Credentials provider against the `users` table, scrypt password hashes and JWT sessions (12h). Roles are `owner` and `attendant`.
 - **Zod 3** schemas shared by the forms (react-hook-form) and the server actions.
 - **Vitest** + **Playwright**, with CI in `.github/workflows/ci.yml`.
-- **Firebase App Hosting** (`apphosting.yaml`). Production needs `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET` and `AUTH_TRUST_HOST=true`.
+- **Vercel** hosting, with Vercel Cron in `vercel.json` (see *Deployment* below).
 - Genkit (`src/ai`) is installed but unused. It's for the AI features on the roadmap.
 
 ## Layout
@@ -136,11 +136,23 @@ The database enforces these rules. Don't work around them:
 - Use the `@/` import alias. Server-only modules start with `import 'server-only'`, except `db/client.ts` and the `server/` services, which scripts and tests also import.
 - Components default to Server Components. Add `'use client'` only on interactive leaves.
 - Use theme colours via tokens (`bg-primary`, `text-muted-foreground`). For money-out and negative figures use `text-red-600 dark:text-red-400`, because the theme's `destructive` is too dark in dark mode.
-- Keep secrets out of git: use `.env.local` locally and App Hosting secrets in production. Document every new variable in `.env.example`.
+- Keep secrets out of git: use `.env.local` locally and Vercel environment variables in production. Document every new variable in `.env.example`.
 - Redirect targets taken from user input must be relative paths (see `login-form.tsx`).
 
 ### Git
 - Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`).
+
+## Deployment (Vercel)
+
+- Every push to a branch gets a Preview deployment; merging to `master` deploys Production.
+- Set these as Vercel project environment variables:
+  - `DATABASE_URL` (required). Vercel has no persistent disk, so the PGlite fallback can't run there. Use the provider's **pooled** connection string (Neon/Supabase). The client already uses a pool of 1 and `prepare: false` on Vercel.
+  - `AUTH_SECRET` (required).
+  - `CRON_SECRET` (required for billing). Vercel Cron sends it automatically as `Authorization: Bearer …`.
+- Point Preview at a separate database or Neon branch, never Production's.
+- **Migrations are not run during the build.** After merging a schema change, run `DATABASE_URL=<prod> npm run db:migrate` before (or immediately after) the deploy. First deploy: also run `npm run db:seed` to create the owner.
+- `vercel.json` cron: `/api/cron/bill-subscriptions` runs at `0 3 * * *` UTC, which is 06:00 Nairobi. Vercel Hobby can fire anywhere within that hour; billing is idempotent, so retries and duplicates are harmless.
+- Auth.js trusts the host automatically on Vercel; `AUTH_TRUST_HOST` is only for other hosts.
 
 ## Definition of done
 1. `npm run lint`, `npm run typecheck` and `npm test` pass. For any UI flow change, `npm run build && npm run test:e2e` also passes.

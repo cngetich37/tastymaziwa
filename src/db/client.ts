@@ -23,7 +23,13 @@ export async function createDb(options: { url?: string; pgliteDir?: string } = {
   if (url) {
     const { default: postgres } = await import('postgres');
     const { drizzle } = await import('drizzle-orm/postgres-js');
-    const client = postgres(url, { max: 10 });
+    const client = postgres(url, {
+      // Serverless functions each hold their own pool: keep it tiny on Vercel
+      // and point DATABASE_URL at your provider's pooled connection string.
+      max: process.env.VERCEL ? 1 : 10,
+      // Transaction-mode poolers (Neon, Supabase) don't support prepared statements.
+      prepare: false,
+    });
     return {
       db: drizzle(client, { schema }) as unknown as DB,
       close: () => client.end(),
