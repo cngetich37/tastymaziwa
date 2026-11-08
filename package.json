@@ -15,14 +15,10 @@
     "db:migrate": "tsx scripts/migrate.mts",
     "db:seed": "tsx scripts/seed.mts",
     "db:studio": "drizzle-kit studio",
-    "user:create": "tsx scripts/create-user.mts",
-    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts"
+    "user:create": "tsx scripts/create-user.mts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",
-    "@genkit-ai/googleai": "^1.28.0",
-    "@genkit-ai/next": "^1.44.0",
     "@hookform/resolvers": "^7.0.3",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -50,8 +46,6 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.4",
     "embla-carousel-react": "^8.6.0",
-    "firebase": "^11.9.1",
-    "genkit": "^1.44.0",
     "lucide-react": "^1.70.0",
     "next": "^16.4.5",
     "next-auth": "^5.0.0-beta.32",
@@ -74,7 +68,6 @@
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.5",
-    "genkit-cli": "^1.45.0",
     "postcss": "^8",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",

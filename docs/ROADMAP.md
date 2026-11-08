@@ -23,6 +23,7 @@ Mark each item done with `[x]` as it ships.
 - [ ] Archive customers and suppliers from the UI. The `archived_at` columns already exist.
 - [ ] Rate-limit sign-in attempts.
 - [ ] Regenerate the remaining unused shadcn components with the current CLI, or delete them.
+- [ ] Migrate zod 3 → 4 (clears the last `npm audit` advisory; `required_error`, `ZodIssueCode` and `.flatten()` usage in `src/lib/validation.ts` and `src/server/action.ts` need updating).
 
 ## P1: Core business features
 
@@ -64,7 +65,7 @@ Mark each item done with `[x]` as it ships.
 
 - [ ] **Offline-first PWA.** The app installs to the home screen. Sales are recorded offline into IndexedDB (Dexie) and sync when the connection returns, with a visible "3 unsynced" badge. Serwist handles the service worker.
 - [ ] **Swahili UI (`sw-KE`)** with a language toggle, using `next-intl`.
-- [ ] **AI daily briefing.** Genkit is already installed. A scheduled flow writes a 3-line summary each evening: *"Sold 52L (+8% vs last Tuesday). 4L spoiled — 2nd day in a row, check the fridge. Jane is 21 days overdue on KSh 1,200."* Send it to the owner by WhatsApp or push notification.
+- [ ] **AI daily briefing.** A scheduled job writes a 3-line summary each evening: *"Sold 52L (+8% vs last Tuesday). 4L spoiled — 2nd day in a row, check the fridge. Jane is 21 days overdue on KSh 1,200."* Send it to the owner by WhatsApp or push notification.
 - [ ] **Demand forecasting.** Suggest tomorrow's order quantity from weekday patterns, holidays and recent trend, so the owner buys less milk that ends up spoiling. Start with a simple moving average by weekday; only move to ML if that proves not good enough.
 - [ ] **Voice or chat entry.** For example, *"Nimeuza lita tano kwa Jane kwa deni"* ("I sold five litres to Jane on credit") becomes a structured credit sale, via an LLM with tool calling and a confirmation step.
 - [ ] **Receipt and invoice OCR.** Photograph the milkman's delivery slip to pre-fill the delivery form.

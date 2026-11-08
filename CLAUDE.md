@@ -42,7 +42,7 @@ npm run user:create -- <username> <owner|attendant> "Full Name"
 - **Zod 3** schemas shared by the forms (react-hook-form) and the server actions.
 - **Vitest** + **Playwright**, with CI in `.github/workflows/ci.yml`.
 - **Vercel** hosting, with Vercel Cron in `vercel.json` (see *Deployment* below).
-- Genkit (`src/ai`) is installed but unused. It's for the AI features on the roadmap.
+- No AI SDK is installed yet. Add one when the first AI feature on the roadmap starts.
 
 ## Layout
 
