@@ -1,20 +1,38 @@
-import { AddSupplierButton, AddUserButton } from '@/components/dialog-buttons';
+import { AddSupplierButton, InviteStaffButton } from '@/components/dialog-buttons';
+import { ShopNameForm, UserActiveToggle } from '@/components/forms/account-forms';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDb } from '@/db';
 import { formatKES } from '@/lib/money';
-import { listSuppliers } from '@/server/queries';
+import { getShop, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 import { listUsers } from '@/server/users';
 
+export const metadata = { title: 'Settings · TastyMaziwa' };
+
 export default async function SettingsPage() {
-  await requireUser(['owner']);
+  const me = await requireUser(['owner']);
   const db = await getDb();
-  const [suppliers, users] = await Promise.all([listSuppliers(db), listUsers(db)]);
+  const [shop, suppliers, users] = await Promise.all([
+    getShop(db, me.shopId),
+    listSuppliers(db, me.shopId),
+    listUsers(db, me.shopId),
+  ]);
 
   return (
     <div className="grid gap-6">
       <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Shop</CardTitle>
+          <CardDescription>Shown in the header and in emails to your team.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ShopNameForm name={shop?.name ?? ''} />
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex-row items-center justify-between">
@@ -54,26 +72,34 @@ export default async function SettingsPage() {
           <CardHeader className="flex-row items-center justify-between">
             <div>
               <CardTitle>Team</CardTitle>
-              <CardDescription>People who can sign in.</CardDescription>
+              <CardDescription>People who can sign in to this shop.</CardDescription>
             </div>
-            <AddUserButton />
+            <InviteStaffButton />
           </CardHeader>
           <CardContent>
             <ul className="divide-y">
-              {users.map((u) => (
-                <li key={u.id} className="flex items-center justify-between gap-3 py-3">
-                  <div>
-                    <p className="font-medium">{u.name}</p>
-                    <p className="text-xs text-muted-foreground">@{u.username}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    {!u.active && <Badge variant="secondary">Disabled</Badge>}
-                    <Badge variant={u.role === 'owner' ? 'default' : 'outline'} className="capitalize">
-                      {u.role}
-                    </Badge>
-                  </div>
-                </li>
-              ))}
+              {users.map((u) => {
+                const invited = !u.hasPassword && !u.emailVerifiedAt;
+                return (
+                  <li key={u.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        {u.name}
+                        {u.id === me.id && <span className="text-muted-foreground"> (you)</span>}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {!u.active && <Badge variant="secondary">Deactivated</Badge>}
+                      {u.active && invited && <Badge variant="outline">Invited</Badge>}
+                      <Badge variant={u.role === 'owner' ? 'default' : 'outline'} className="capitalize">
+                        {u.role}
+                      </Badge>
+                      {u.id !== me.id && <UserActiveToggle userId={u.id} active={u.active} name={u.name} />}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </CardContent>
         </Card>

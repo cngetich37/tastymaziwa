@@ -1,13 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { E2E_OWNER } from '../playwright.config';
-
-async function signIn(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await page.getByLabel('Username').fill(username);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
-}
+import { linkFrom, signInWithPassword as signIn, uniqueEmail, waitForMail } from './helpers';
 
 test('signed-out visitors are sent to the login page', async ({ page }) => {
   await page.goto('/credit');
@@ -16,10 +9,10 @@ test('signed-out visitors are sent to the login page', async ({ page }) => {
 
 test('wrong password is rejected', async ({ page }) => {
   await page.goto('/login');
-  await page.getByLabel('Username').fill(E2E_OWNER.username);
-  await page.getByLabel('Password').fill('not-the-password');
-  await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page.getByText('Invalid username or password')).toBeVisible();
+  await page.getByLabel('Email', { exact: true }).fill(E2E_OWNER.email);
+  await page.getByLabel('Password', { exact: true }).fill('not-the-password');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: "didn't work" })).toBeVisible();
 });
 
 test('cron endpoint refuses requests without the secret', async ({ request }) => {
@@ -28,7 +21,7 @@ test('cron endpoint refuses requests without the secret', async ({ request }) =>
 });
 
 test('owner records a delivery and a cash sale, then reverses the sale', async ({ page }) => {
-  await signIn(page, E2E_OWNER.username, E2E_OWNER.password);
+  await signIn(page, E2E_OWNER.email, E2E_OWNER.password);
   const stats = page.getByRole('region', { name: "Today's figures" });
 
   // Delivery: 40 L at the supplier's default KSh 50.
@@ -59,7 +52,7 @@ test('owner records a delivery and a cash sale, then reverses the sale', async (
 });
 
 test('credit sales show up as money owed', async ({ page }) => {
-  await signIn(page, E2E_OWNER.username, E2E_OWNER.password);
+  await signIn(page, E2E_OWNER.email, E2E_OWNER.password);
 
   await page.goto('/credit');
   await page.getByRole('button', { name: 'Customer' }).click();
@@ -82,20 +75,30 @@ test('credit sales show up as money owed', async ({ page }) => {
   await expect(page.getByText('Customers owe you Ksh 210')).toBeVisible();
 });
 
-test('an attendant cannot open settings', async ({ page }) => {
-  // Create an attendant as the owner.
-  await signIn(page, E2E_OWNER.username, E2E_OWNER.password);
+test('an invited attendant sets a password and cannot open settings', async ({ page }) => {
+  const email = uniqueEmail('attendant');
+  // The owner invites them by email.
+  await signIn(page, E2E_OWNER.email, E2E_OWNER.password);
   await page.goto('/settings');
-  await page.getByRole('button', { name: 'User' }).click();
+  await page.getByRole('button', { name: 'Invite' }).click();
   await page.getByLabel('Full name').fill('Counter Staff');
-  await page.getByLabel('Username').fill('attendant1');
-  await page.getByLabel('Password').fill('attendant-password');
-  await page.getByRole('button', { name: 'Create user' }).click();
-  await expect(page.getByText('@attendant1')).toBeVisible();
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByRole('button', { name: 'Send invite' }).click();
+  await expect(page.getByText(email)).toBeVisible();
+  await expect(page.getByText('Invited', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login/);
 
-  await signIn(page, 'attendant1', 'attendant-password');
+  // They follow the link in the invite email and choose a password.
+  await page.goto(linkFrom(await waitForMail(email)));
+  await expect(page.getByRole('heading', { name: 'Welcome! Set your password' })).toBeVisible();
+  await page.getByLabel('New password', { exact: true }).fill('attendant-password');
+  await page.getByLabel('Confirm new password').fill('attendant-password');
+  await page.getByRole('button', { name: 'Save password' }).click();
+  await expect(page).toHaveURL(/\/login\?reset=1/);
+
+  await signIn(page, email, 'attendant-password');
+  await expect(page.getByRole('banner')).toContainText('E2E Dairy');
   await expect(page.getByText('Net profit today')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0);
   await page.goto('/settings');

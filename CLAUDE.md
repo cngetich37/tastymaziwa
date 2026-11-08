@@ -1,6 +1,6 @@
 # CLAUDE.md — TastyMaziwa
 
-TastyMaziwa ("tasty milk" in Swahili) is a profit tracker for a small **Kenyan milk shop** (a *maziwa* duka). The owner buys milk in bulk from a milkman, sells it by the litre for cash, M-Pesa or on credit (*deni*), and needs to know every day: how much came in, how much sold, who owes what, and whether the shop made money.
+TastyMaziwa ("tasty milk" in Swahili) is a profit tracker for small **Kenyan milk shops** (a *maziwa* duka). It is **multi-tenant**: anyone can sign up and gets their own private shop. The owner buys milk in bulk from a milkman, sells it by the litre for cash, M-Pesa or on credit (*deni*), and needs to know every day: how much came in, how much sold, who owes what, and whether the shop made money.
 
 The original product spec is in `docs/blueprint.md`. The prioritised feature plan is in `docs/ROADMAP.md`. Read the roadmap before starting feature work, and tick items off as they ship.
 
@@ -21,24 +21,26 @@ npm run typecheck      # tsc --noEmit
 npm test               # Vitest: unit tests + integration tests on in-memory Postgres
 npm run test:e2e       # Playwright on a phone viewport. Run `npm run build` first.
 
-npm run db:seed        # create the owner account (password printed once) + default supplier
+npm run db:seed        # a demo shop + verified owner (owner@example.com, password printed once)
 npm run db:seed -- --demo   # ...plus two weeks of demo trading
 npm run db:generate    # create a migration after editing src/db/schema.ts
 npm run db:migrate     # apply migrations (required for hosted Postgres)
 npm run db:studio      # browse the database
-npm run user:create -- <username> <owner|attendant> "Full Name"
 ```
 
-**First run:** copy `.env.example` to `.env.local` and set `AUTH_SECRET` (`npx auth secret`). Then run `npm run db:seed -- --demo` followed by `npm run dev`.
+**First run:** copy `.env.example` to `.env.local` and set `AUTH_SECRET` (`npx auth secret`). Then run `npm run db:seed -- --demo` followed by `npm run dev`. Or skip the seed and sign up at `/signup`.
 
-**PGlite is single-process.** Stop `npm run dev` before running `db:*` or `user:create` scripts against the local database, or they will fight over `.data/pglite`.
+**Emails in development** (sign-up codes, sign-in codes, reset links, invites) are written to `.data/outbox/*.json` and printed in the dev server log. Nothing is sent unless `SMTP_HOST` is set.
+
+**PGlite is single-process.** Stop `npm run dev` before running `db:*` scripts against the local database, or they will fight over `.data/pglite`.
 
 ## Stack
 
 - **Next.js 16 App Router + React 19**, TypeScript strict. `src/proxy.ts` (formerly middleware). Route params and `searchParams` are async (`await props.searchParams`).
 - **Tailwind CSS v4** (CSS-first config in `src/app/globals.css`, using `@theme` and `tw-animate-css`), with shadcn/ui primitives in `src/components/ui`. That folder is generated code: change it with the shadcn CLI, don't hand-edit it. Lint skips it.
 - **PostgreSQL + Drizzle ORM.** Locally it runs on embedded **PGlite** (Postgres in WASM) in `.data/pglite`, so there's nothing to install. With `DATABASE_URL` set it uses hosted Postgres through `postgres-js`.
-- **Auth.js (next-auth v5)** with a Credentials provider against the `users` table, scrypt password hashes and JWT sessions (12h). Roles are `owner` and `attendant`.
+- **Auth.js (next-auth v5)**, JWT sessions, two Credentials providers: `password` and `email-code` (passwordless; also completes sign-up). Scrypt password hashes. Roles are `owner` and `attendant`, per shop. See *Authentication* below.
+- **Nodemailer** over SMTP for email; a file outbox in development and tests.
 - **Zod 4** schemas shared by the forms (react-hook-form) and the server actions.
 - **Vitest** + **Playwright**, with CI in `.github/workflows/ci.yml`.
 - **Vercel** hosting, with Vercel Cron in `vercel.json` (see *Deployment* below).
@@ -49,9 +51,10 @@ npm run user:create -- <username> <owner|attendant> "Full Name"
 ```
 src/
   app/
-    (app)/            authenticated pages: / (Today), /ledger, /credit, /settings (owner)
-    login/            sign-in page
-    actions.ts        ALL server actions ('use server'), each wrapped in defineAction
+    (app)/            signed-in pages: / (Today), /ledger, /credit, /account, /settings (owner)
+    (auth)/           signed-out pages: /login, /signup, /forgot-password, /reset-password
+    actions.ts        signed-in server actions, each wrapped in defineAction
+    auth-actions.ts   signed-out server actions (definePublicAction): sign-up, codes, reset
     api/auth/         Auth.js handlers
     api/cron/         bill-subscriptions (Bearer CRON_SECRET), for a scheduler
   db/
@@ -61,8 +64,10 @@ src/
   server/             server-only logic
     ledger.ts         every ledger WRITE: one DB transaction + audit row each
     queries.ts        read models (SQL aggregates → pure calc functions)
-    action.ts         defineAction: auth + role + Zod + error mapping + revalidate
-    session.ts        currentUser / requireUser(roles)
+    action.ts         defineAction / definePublicAction: auth + role + Zod + errors
+    session.ts        currentUser / requireUser(roles) -> { id, role, shopId, ... }
+    auth/             accounts.ts (all auth flows), tokens.ts (codes/links),
+                      rate-limit.ts, mailer.ts, emails.ts, config.ts
     users.ts, password.ts
   lib/                isomorphic and pure: safe on the client
     money.ts          cents/millilitre parsing, line totals, formatting
@@ -73,8 +78,36 @@ src/
     forms/            entry-forms.tsx (all forms), fields.tsx, use-action-form.ts
 drizzle/              generated SQL migrations (commit them; never edit applied ones)
 e2e/                  Playwright specs
-scripts/              seed, migrate, create-user (run with tsx)
+scripts/              seed, migrate (run with tsx)
 ```
+
+## Multi-tenancy: every row belongs to a shop
+
+`shops` is the tenant. `users`, `customers`, `suppliers`, `subscriptions`, `ledger_entries` and `audit_log` all have `shop_id`. **This is the rule that must never break: one shop must never see or change another shop's data.**
+
+- **Every query filters by `shopId`, and every insert sets it.** Services get it from `actor.shopId`; queries take `shopId` as their second argument. Take it from the session (`requireUser()` / `defineAction`), **never from client input**.
+- **Look up by id *and* shop:** `where(and(eq(t.id, id), eq(t.shopId, actor.shopId)))`. A bare `eq(t.id, id)` on a client-supplied id is a cross-tenant bug.
+- The database backs this up: composite foreign keys `(customer_id, shop_id) -> customers(id, shop_id)` (and likewise for suppliers, subscriptions and reversals) make it impossible for a ledger row to reference another shop's records, even if a query is wrong.
+- Every new table holding shop data gets `shop_id` (with an index), and every new service or query gets a tenant-isolation test (see the `tenant isolation` block in `src/server/ledger.test.ts`).
+- The cron route loops over all shops and bills each one with `systemActor(shopId)`.
+
+## Authentication
+
+| Flow | How |
+|---|---|
+| Sign up | `/signup`: shop name, name, email, password, then a 6-digit code is emailed. Entering it creates the **shop + owner** and signs in (`email-code` provider, `intent: 'signup'`). The pending account lives only in `auth_tokens.data` until verified. |
+| Sign in | Password (`password` provider) **or** passwordless: email, then a 6-digit code, then the `email-code` provider. |
+| Forgot password | `/forgot-password` sends a single-use link (30 min) to `/reset-password?token=...`. Resetting bumps `session_version`, so every other session ends. |
+| Staff | Owners invite by email from Settings; the invite is a 72 h set-password link, and invitees can also sign in with a code straight away. Owners can deactivate staff. |
+| Account | `/account`: change name, email (confirmed by a code to the new address) and password (signs out other devices). |
+| Sessions | JWT cookie; **30 min idle** timeout (each request slides it), **12 h hard limit**, user row re-checked every 5 min (deactivated or password changed: signed out). `SessionTimeout` mirrors the idle timer in the browser and signs the tab out. All configurable via `SESSION_*` env vars. |
+
+Security rules for auth code:
+- Request endpoints (sign-up, code, reset) **never reveal whether an email exists**: same response either way, and mail is only sent when there's something to send.
+- Codes and link tokens are stored only as **HMAC-SHA256 (keyed by AUTH_SECRET)**, are single-use, and expire. Codes allow 5 attempts. `verifyCode` runs **outside** any transaction so failed attempts stay counted.
+- Rate limits (`server/auth/rate-limit.ts`, DB-backed): 3 emails per address and 15 per IP per 15 min; 5 failed password attempts lock that address for 15 min (email codes still work).
+- Links in emails use `appUrl()` (APP_URL / Vercel URL), **never the request Host header** (that would allow reset-link poisoning).
+- After a password change the current session is kept alive via `updateSession({ sv, svProof })`. The jwt callback only accepts a new session version with a valid server HMAC, because `update()` can also be triggered from the browser.
 
 ## Domain model: the ledger is the source of truth
 
@@ -111,13 +144,14 @@ The database enforces these rules. Don't work around them:
 
 ### Writing data
 - UI mutations go through **server actions in `src/app/actions.ts`**, each built with `defineAction({ schema, roles }, handler)`. Server actions are public HTTP endpoints, so the wrapper's auth, role check and Zod parse are mandatory. Never export an unwrapped action.
-- Actions are thin: they call a service in `src/server/ledger.ts`. Services take `(db, actor, input)`, run in `db.transaction`, and write an `audit_log` row.
+- Actions are thin: they call a service in `src/server/ledger.ts` or `src/server/auth/accounts.ts`. Services take `(db, actor, input)` (the actor carries `shopId`), run in `db.transaction`, and write an `audit_log` row.
+- Signed-out actions go in `src/app/auth-actions.ts` with `definePublicAction`, and must rate-limit.
 - Business-rule failures throw `DomainError`; its message is shown to the user. Anything else is logged and gets a generic error.
 - **Route handlers only for external callers** (cron, future M-Pesa callbacks). They do their own auth: a bearer secret compared with `timingSafeEqual`, or a signature check.
 - Roles: an **attendant** can record sales, deliveries, customer payments and spoilage, add customers, and bill subscriptions. An **owner** can additionally see profit and record expenses and supplier payments. Owners also reverse entries and manage suppliers, subscriptions and users.
 
 ### Reading data
-- Pages are async Server Components. Start with `await requireUser()` (or `requireUser(['owner'])`), then `const db = await getDb()`, then call `src/server/queries.ts`. Pass plain data to client components.
+- Pages are async Server Components. Start with `const user = await requireUser()` (or `requireUser(['owner'])`), then `const db = await getDb()`, then call `src/server/queries.ts` with `user.shopId`. Pass plain data to client components.
 - Aggregate in SQL (`sum`, `group by`) and derive in `lib/calc`. Don't load the whole ledger into JS.
 
 ### Forms
@@ -138,7 +172,7 @@ The database enforces these rules. Don't work around them:
 - Components default to Server Components. Add `'use client'` only on interactive leaves.
 - Use theme colours via tokens (`bg-primary`, `text-muted-foreground`). For money-out and negative figures use `text-red-600 dark:text-red-400`, because the theme's `destructive` is too dark in dark mode.
 - Keep secrets out of git: use `.env.local` locally and Vercel environment variables in production. Document every new variable in `.env.example`.
-- Redirect targets taken from user input must be relative paths (see `login-form.tsx`).
+- Redirect targets taken from user input must be relative paths (see `useCallbackUrl` in `app/(auth)/auth-forms.tsx`).
 
 ### Git
 - Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`).
@@ -150,14 +184,15 @@ The database enforces these rules. Don't work around them:
   - `DATABASE_URL` (required). Vercel has no persistent disk, so the PGlite fallback can't run there. Use the provider's **pooled** connection string (Neon/Supabase). The client already uses a pool of 1 and `prepare: false` on Vercel.
   - `AUTH_SECRET` (required).
   - `CRON_SECRET` (required for billing). Vercel Cron sends it automatically as `Authorization: Bearer …`.
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` (required: sign-up, codes and resets all need email). Optional `APP_URL` for a custom domain.
 - Point Preview at a separate database or Neon branch, never Production's.
-- **Migrations are not run during the build.** After merging a schema change, run `DATABASE_URL=<prod> npm run db:migrate` before (or immediately after) the deploy. First deploy: also run `npm run db:seed` to create the owner.
+- **Migrations are not run during the build.** After merging a schema change, run `DATABASE_URL=<prod> npm run db:migrate` before (or immediately after) the deploy. No seeding is needed in production: shops are created by signing up.
 - `vercel.json` cron: `/api/cron/bill-subscriptions` runs at `0 3 * * *` UTC, which is 06:00 Nairobi. Vercel Hobby can fire anywhere within that hour; billing is idempotent, so retries and duplicates are harmless.
 - Auth.js trusts the host automatically on Vercel; `AUTH_TRUST_HOST` is only for other hosts.
 
 ## Definition of done
 1. `npm run lint`, `npm run typecheck` and `npm test` pass. For any UI flow change, `npm run build && npm run test:e2e` also passes.
-2. New money, stock or date logic has unit tests. New services have an integration test in `src/server/*.test.ts`.
+2. New money, stock or date logic has unit tests. New services have an integration test in `src/server/**/*.test.ts`, including tenant isolation for anything touching shop data.
 3. Works at 360px width and in dark mode.
 4. New environment variables are in `.env.example`; schema changes have a migration.
 5. `docs/ROADMAP.md` is updated.

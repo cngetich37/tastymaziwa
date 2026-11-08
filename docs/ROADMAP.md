@@ -19,9 +19,9 @@ Mark each item done with `[x]` as it ships.
 **Follow-ups found during P0:**
 - [ ] Group the Credit page's unpaid list by customer. Subscription customers produce one row per day.
 - [ ] Turn on Cache Components (`cacheComponents: true`) once the data layer settles.
-- [ ] Deactivate users and reset passwords from Settings. Today you can only add users.
+- [x] Deactivate users from Settings; self-service password reset by email; change password/email on the Account page.
 - [ ] Archive customers and suppliers from the UI. The `archived_at` columns already exist.
-- [ ] Rate-limit sign-in attempts.
+- [x] Rate-limit sign-in attempts (5 failures per address per 15 min) and outgoing emails.
 - [ ] Regenerate the remaining unused shadcn components with the current CLI, or delete them.
 - [x] Migrate zod 3 → 4 (clears the last production `npm audit` advisory).
 
@@ -75,7 +75,8 @@ Mark each item done with `[x]` as it ships.
 
 ## P3: Expansion
 
-- [ ] **Multi-shop / multi-tenant.** One owner with several outlets, per-shop dashboards and a consolidated view. Use row-level tenancy (`shop_id` on every table).
+- [x] **Multi-tenant.** Each sign-up gets its own private shop (`shop_id` everywhere, composite same-shop foreign keys, isolation tests).
+- [ ] **Multi-outlet.** One owner running several shops: shop switcher, per-outlet dashboards and a consolidated view. Needs a user-to-shop membership table instead of `users.shop_id`.
 - [ ] **eTIMS integration** (KRA electronic tax invoices) if the business crosses the VAT/turnover threshold.
 - [ ] **USSD access** for an attendant without a smartphone, via Africa's Talking USSD.
 - [ ] **Cold-chain sensor.** Read fridge temperature from a cheap IoT sensor and alert before milk spoils.

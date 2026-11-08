@@ -1,5 +1,6 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { z } from 'zod';
 import { getDb, type DB } from '@/db';
 import type { Role } from '@/db/schema';
@@ -16,7 +17,7 @@ export type { ActionResult } from '@/lib/action-result';
  */
 export function defineAction<S extends z.ZodType, T>(
   options: { schema: S; roles: Role[] },
-  handler: (ctx: { db: DB; actor: Actor }, input: z.output<S>) => Promise<T>,
+  handler: (ctx: { db: DB; actor: Actor; ip: string }, input: z.output<S>) => Promise<T>,
 ) {
   return async (raw: z.input<S>): Promise<ActionResult<T>> => {
     const user = await currentUser();
@@ -35,7 +36,7 @@ export function defineAction<S extends z.ZodType, T>(
     }
 
     try {
-      const data = await handler({ db: await getDb(), actor: toActor(user) }, parsed.data);
+      const data = await handler({ db: await getDb(), actor: toActor(user), ip: await clientIp() }, parsed.data);
       revalidatePath('/', 'layout');
       return { ok: true, data };
     } catch (error) {
@@ -48,3 +49,39 @@ export function defineAction<S extends z.ZodType, T>(
 
 export const ANY_ROLE: Role[] = ['owner', 'attendant'];
 export const OWNER: Role[] = ['owner'];
+
+/**
+ * For signed-out flows (sign-up, codes, password reset): validation and error
+ * mapping, but no session. Handlers must rate-limit (see server/auth).
+ */
+export function definePublicAction<S extends z.ZodType, T>(
+  schema: S,
+  handler: (ctx: { db: DB; ip: string }, input: z.output<S>) => Promise<ActionResult<T>>,
+) {
+  return async (raw: z.input<S>): Promise<ActionResult<T>> => {
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: 'Please fix the highlighted fields.',
+        fieldErrors: z.flattenError(parsed.error).fieldErrors,
+      };
+    }
+    try {
+      return await handler({ db: await getDb(), ip: await clientIp() }, parsed.data);
+    } catch (error) {
+      if (error instanceof DomainError) return { ok: false, error: error.message };
+      console.error('[public action] unexpected error', error);
+      return { ok: false, error: 'Something went wrong. Please try again.' };
+    }
+  };
+}
+
+/**
+ * Client IP for rate limiting. On Vercel, x-forwarded-for is set by the edge
+ * network (the left-most entry is the client); locally it's absent.
+ */
+export async function clientIp(): Promise<string> {
+  const h = await headers();
+  return h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'local';
+}

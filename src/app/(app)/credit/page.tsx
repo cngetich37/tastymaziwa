@@ -14,9 +14,9 @@ export default async function CreditPage() {
   const isOwner = user.role === 'owner';
   const db = await getDb();
   const [outstanding, customers, salePrice] = await Promise.all([
-    getOutstandingCredit(db),
-    listCustomers(db),
-    getLastSalePriceCents(db),
+    getOutstandingCredit(db, user.shopId),
+    listCustomers(db, user.shopId),
+    getLastSalePriceCents(db, user.shopId),
   ]);
   const totalOwed = customers.reduce((sum, c) => sum + Math.max(0, c.balanceCents), 0);
 

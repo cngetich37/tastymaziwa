@@ -10,6 +10,8 @@ import type { ActionResult } from '@/lib/action-result';
 interface Options<T> {
   success: string | ((data: T) => string);
   onSuccess?: (data: T) => void;
+  /** Keep the submitted values after success (edit forms) instead of clearing. */
+  keepValues?: boolean;
 }
 
 /**
@@ -37,7 +39,7 @@ export function useActionForm<S extends z.ZodType<FieldValues, FieldValues>, T>(
         const message =
           typeof options.success === 'function' ? options.success(result.data) : options.success;
         toast({ title: message });
-        form.reset(defaultValues);
+        form.reset(options.keepValues ? raw : defaultValues);
         options.onSuccess?.(result.data);
         return;
       }

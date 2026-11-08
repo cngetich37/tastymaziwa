@@ -4,16 +4,23 @@
  * role-checked and validated by `defineAction`. External callers (cron,
  * payment callbacks) use route handlers under src/app/api instead.
  */
+import { sessionVersionProof, updateSession } from '@/auth';
 import { ANY_ROLE, OWNER, defineAction } from '@/server/action';
+import * as accounts from '@/server/auth/accounts';
 import * as ledger from '@/server/ledger';
-import { createUser } from '@/server/users';
 import {
   billSubscriptionsSchema,
   customerPaymentSchema,
   customerSchema,
   deliverySchema,
+  changePasswordSchema,
+  confirmEmailChangeSchema,
   expenseSchema,
-  newUserSchema,
+  inviteStaffSchema,
+  profileSchema,
+  requestEmailChangeSchema,
+  shopSchema,
+  userActiveSchema,
   reverseEntrySchema,
   saleSchema,
   spoilageSchema,
@@ -89,6 +96,42 @@ export const setSubscriptionStatusAction = defineAction(
     ledger.setSubscriptionStatus(db, actor, input.subscriptionId, input.status).then(idOnly),
 );
 
-export const createUserAction = defineAction({ schema: newUserSchema, roles: OWNER }, ({ db, actor }, input) =>
-  createUser(db, actor, input).then(idOnly),
+// --- your account (any role) --------------------------------------------------
+
+export const updateProfileAction = defineAction({ schema: profileSchema, roles: ANY_ROLE }, ({ db, actor }, input) =>
+  accounts.updateProfile(db, actor, input.name).then(() => null),
+);
+
+export const changePasswordAction = defineAction(
+  { schema: changePasswordSchema, roles: ANY_ROLE },
+  async ({ db, actor }, input) => {
+    const version = await accounts.changePassword(db, actor, input.currentPassword, input.password);
+    // Other sessions are now invalid; keep this one alive with a signed proof.
+    await updateSession({ sv: version, svProof: sessionVersionProof(actor.id!, version) } as never);
+    return null;
+  },
+);
+
+export const requestEmailChangeAction = defineAction(
+  { schema: requestEmailChangeSchema, roles: ANY_ROLE },
+  ({ db, actor, ip }, input) => accounts.requestEmailChange(db, actor, input.email, ip).then(() => null),
+);
+
+export const confirmEmailChangeAction = defineAction(
+  { schema: confirmEmailChangeSchema, roles: ANY_ROLE },
+  ({ db, actor }, input) => accounts.confirmEmailChange(db, actor, input.email, input.code).then(() => null),
+);
+
+// --- shop & team (owner) -------------------------------------------------------
+
+export const renameShopAction = defineAction({ schema: shopSchema, roles: OWNER }, ({ db, actor }, input) =>
+  accounts.renameShop(db, actor, input.name).then(() => null),
+);
+
+export const inviteStaffAction = defineAction({ schema: inviteStaffSchema, roles: OWNER }, ({ db, actor }, input) =>
+  accounts.inviteStaff(db, actor, input).then(idOnly),
+);
+
+export const setUserActiveAction = defineAction({ schema: userActiveSchema, roles: OWNER }, ({ db, actor }, input) =>
+  accounts.setUserActive(db, actor, input.userId, input.active).then(() => null),
 );

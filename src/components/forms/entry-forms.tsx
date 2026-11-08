@@ -5,7 +5,7 @@ import {
   createCustomerAction,
   createSubscriptionAction,
   createSupplierAction,
-  createUserAction,
+  inviteStaffAction,
   recordCustomerPaymentAction,
   recordDeliveryAction,
   recordExpenseAction,
@@ -22,7 +22,7 @@ import {
   customerSchema,
   deliverySchema,
   expenseSchema,
-  newUserSchema,
+  inviteStaffSchema,
   saleSchema,
   spoilageSchema,
   subscriptionSchema,
@@ -331,19 +331,23 @@ export function SupplierForm({ onDone }: FormProps) {
   );
 }
 
-export function UserForm({ onDone }: FormProps) {
+export function InviteStaffForm({ onDone }: FormProps) {
   const { form, onSubmit, pending } = useActionForm(
-    newUserSchema,
-    createUserAction,
-    { name: '', username: '', password: '', role: 'attendant' },
-    { success: 'User created', onSuccess: onDone },
+    inviteStaffSchema,
+    inviteStaffAction,
+    { name: '', email: '', role: 'attendant' },
+    { success: 'Invite sent', onSuccess: onDone },
   );
   return (
     <Form {...form}>
       <form onSubmit={onSubmit} className="grid gap-4" noValidate>
         <TextField name="name" label="Full name" />
-        <TextField name="username" label="Username" />
-        <TextField name="password" label="Password" kind="password" description="At least 10 characters." />
+        <TextField
+          name="email"
+          label="Email"
+          kind="email"
+          description="They'll get a link to set their password, or can sign in with an emailed code."
+        />
         <ChoiceField
           name="role"
           label="Role"
@@ -352,7 +356,7 @@ export function UserForm({ onDone }: FormProps) {
             { value: 'owner', label: 'Owner' },
           ]}
         />
-        <SubmitButton pending={pending}>Create user</SubmitButton>
+        <SubmitButton pending={pending}>Send invite</SubmitButton>
       </form>
     </Form>
   );

@@ -28,7 +28,16 @@ interface BaseProps {
   description?: ReactNode;
 }
 
-type InputKind = 'text' | 'money' | 'litres' | 'date' | 'tel' | 'password';
+type InputKind =
+  | 'text'
+  | 'money'
+  | 'litres'
+  | 'date'
+  | 'tel'
+  | 'email'
+  | 'password'
+  | 'current-password'
+  | 'code';
 
 const inputProps: Record<InputKind, React.InputHTMLAttributes<HTMLInputElement>> = {
   text: { type: 'text' },
@@ -37,7 +46,11 @@ const inputProps: Record<InputKind, React.InputHTMLAttributes<HTMLInputElement>>
   litres: { type: 'text', inputMode: 'decimal', autoComplete: 'off' },
   date: { type: 'date' },
   tel: { type: 'tel', inputMode: 'tel', autoComplete: 'tel' },
+  email: { type: 'email', inputMode: 'email', autoComplete: 'email', autoCapitalize: 'none', spellCheck: false },
   password: { type: 'password', autoComplete: 'new-password' },
+  'current-password': { type: 'password', autoComplete: 'current-password' },
+  // one-time-code lets phones offer the code straight from the email notification.
+  code: { type: 'text', inputMode: 'numeric', autoComplete: 'one-time-code', maxLength: 7 },
 };
 
 const suffixes: Partial<Record<InputKind, string>> = { money: 'KSh', litres: 'L' };

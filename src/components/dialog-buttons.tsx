@@ -9,7 +9,7 @@ import {
   CustomerPaymentForm,
   SubscriptionForm,
   SupplierForm,
-  UserForm,
+  InviteStaffForm,
   type CustomerOption,
 } from '@/components/forms/entry-forms';
 
@@ -78,14 +78,14 @@ export function AddSupplierButton() {
   );
 }
 
-export function AddUserButton() {
+export function InviteStaffButton() {
   return (
     <FormDialog
-      trigger={<AddButton label="User" />}
-      title="Add user"
-      description="Attendants can record sales, deliveries and payments. Only owners see profit and can reverse entries."
+      trigger={<AddButton label="Invite" />}
+      title="Invite a team member"
+      description="Attendants record sales, deliveries and payments. Owners also see profit, reverse entries and manage the team."
     >
-      {(close) => <UserForm onDone={close} />}
+      {(close) => <InviteStaffForm onDone={close} />}
     </FormDialog>
   );
 }

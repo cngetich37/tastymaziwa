@@ -29,13 +29,17 @@ import type {
   SupplierPaymentInput,
 } from '@/lib/validation';
 
-/** Who is making the change. `null` id = the system (e.g. a scheduled job). */
+/**
+ * Who is making the change, and in which shop. Every service is scoped to
+ * `actor.shopId`. `null` id = the system (e.g. the billing cron).
+ */
 export interface Actor {
   id: string | null;
   role: Role | 'system';
+  shopId: string;
 }
 
-export const SYSTEM_ACTOR: Actor = { id: null, role: 'system' };
+export const systemActor = (shopId: string): Actor => ({ id: null, role: 'system', shopId });
 
 /** An expected business-rule failure, safe to show to the user. */
 export class DomainError extends Error {
@@ -56,6 +60,7 @@ async function audit(
   data?: unknown,
 ) {
   await tx.insert(auditLog).values({
+    shopId: actor.shopId,
     userId: actor.id,
     action,
     entityType,
@@ -64,10 +69,10 @@ async function audit(
   });
 }
 
-async function insertEntry(tx: Tx, actor: Actor, values: NewLedgerEntry): Promise<LedgerEntry> {
+async function insertEntry(tx: Tx, actor: Actor, values: Omit<NewLedgerEntry, 'shopId'>): Promise<LedgerEntry> {
   const [entry] = await tx
     .insert(ledgerEntries)
-    .values({ ...values, createdBy: actor.id })
+    .values({ ...values, shopId: actor.shopId, createdBy: actor.id })
     .returning();
   await audit(tx, actor, `ledger.${values.kind}`, 'ledger_entry', entry.id, {
     amountCents: entry.amountCents,
@@ -78,20 +83,20 @@ async function insertEntry(tx: Tx, actor: Actor, values: NewLedgerEntry): Promis
   return entry;
 }
 
-async function assertCustomer(tx: Tx, customerId: string) {
+async function assertCustomer(tx: Tx, actor: Actor, customerId: string) {
   const [row] = await tx
     .select({ id: customers.id, archivedAt: customers.archivedAt })
     .from(customers)
-    .where(eq(customers.id, customerId));
+    .where(and(eq(customers.id, customerId), eq(customers.shopId, actor.shopId)));
   if (!row) throw new DomainError('Customer not found');
   if (row.archivedAt) throw new DomainError('That customer has been archived');
 }
 
-async function assertSupplier(tx: Tx, supplierId: string) {
+async function assertSupplier(tx: Tx, actor: Actor, supplierId: string) {
   const [row] = await tx
     .select({ id: suppliers.id })
     .from(suppliers)
-    .where(eq(suppliers.id, supplierId));
+    .where(and(eq(suppliers.id, supplierId), eq(suppliers.shopId, actor.shopId)));
   if (!row) throw new DomainError('Supplier not found');
 }
 
@@ -100,7 +105,7 @@ async function assertSupplier(tx: Tx, supplierId: string) {
 export function recordSale(db: DB, actor: Actor, input: SaleInput) {
   return db.transaction(async (tx) => {
     const businessDate = input.date ?? todayBusinessDate();
-    if (input.customerId) await assertCustomer(tx, input.customerId);
+    if (input.customerId) await assertCustomer(tx, actor, input.customerId);
     const isCredit = input.paymentMethod === 'credit';
     return insertEntry(tx, actor, {
       kind: 'sale',
@@ -118,7 +123,7 @@ export function recordSale(db: DB, actor: Actor, input: SaleInput) {
 
 export function recordDelivery(db: DB, actor: Actor, input: DeliveryInput) {
   return db.transaction(async (tx) => {
-    await assertSupplier(tx, input.supplierId);
+    await assertSupplier(tx, actor, input.supplierId);
     return insertEntry(tx, actor, {
       kind: 'delivery',
       businessDate: input.date ?? todayBusinessDate(),
@@ -133,7 +138,7 @@ export function recordDelivery(db: DB, actor: Actor, input: DeliveryInput) {
 
 export function recordCustomerPayment(db: DB, actor: Actor, input: CustomerPaymentInput) {
   return db.transaction(async (tx) => {
-    await assertCustomer(tx, input.customerId);
+    await assertCustomer(tx, actor, input.customerId);
     return insertEntry(tx, actor, {
       kind: 'customer_payment',
       businessDate: input.date ?? todayBusinessDate(),
@@ -147,7 +152,7 @@ export function recordCustomerPayment(db: DB, actor: Actor, input: CustomerPayme
 
 export function recordSupplierPayment(db: DB, actor: Actor, input: SupplierPaymentInput) {
   return db.transaction(async (tx) => {
-    await assertSupplier(tx, input.supplierId);
+    await assertSupplier(tx, actor, input.supplierId);
     return insertEntry(tx, actor, {
       kind: 'supplier_payment',
       businessDate: input.date ?? todayBusinessDate(),
@@ -189,7 +194,10 @@ export function recordSpoilage(db: DB, actor: Actor, input: SpoilageInput) {
  */
 export function reverseEntry(db: DB, actor: Actor, entryId: string, reason: string) {
   return db.transaction(async (tx) => {
-    const [original] = await tx.select().from(ledgerEntries).where(eq(ledgerEntries.id, entryId));
+    const [original] = await tx
+      .select()
+      .from(ledgerEntries)
+      .where(and(eq(ledgerEntries.id, entryId), eq(ledgerEntries.shopId, actor.shopId)));
     if (!original) throw new DomainError('Entry not found');
     if (original.reversesId) throw new DomainError('A reversal cannot itself be reversed');
     const [existing] = await tx
@@ -226,7 +234,13 @@ export function billSubscriptions(db: DB, actor: Actor, date: BusinessDate = tod
     const active = await tx
       .select()
       .from(subscriptions)
-      .where(and(eq(subscriptions.status, 'active'), lte(subscriptions.startDate, date)));
+      .where(
+        and(
+          eq(subscriptions.shopId, actor.shopId),
+          eq(subscriptions.status, 'active'),
+          lte(subscriptions.startDate, date),
+        ),
+      );
 
     let billed = 0;
     let volumeMl = 0;
@@ -236,6 +250,7 @@ export function billSubscriptions(db: DB, actor: Actor, date: BusinessDate = tod
       const inserted = await tx
         .insert(ledgerEntries)
         .values({
+          shopId: actor.shopId,
           kind: 'sale',
           businessDate: date,
           volumeMl: sub.dailyMl,
@@ -270,10 +285,11 @@ export function billSubscriptions(db: DB, actor: Actor, date: BusinessDate = tod
 
 export function createSubscription(db: DB, actor: Actor, input: SubscriptionInput) {
   return db.transaction(async (tx) => {
-    await assertCustomer(tx, input.customerId);
+    await assertCustomer(tx, actor, input.customerId);
     const [sub] = await tx
       .insert(subscriptions)
       .values({
+        shopId: actor.shopId,
         customerId: input.customerId,
         dailyMl: input.dailyLitres,
         pricePerLitreCents: input.pricePerLitre,
@@ -295,7 +311,7 @@ export function setSubscriptionStatus(
     const [current] = await tx
       .select({ status: subscriptions.status })
       .from(subscriptions)
-      .where(eq(subscriptions.id, subscriptionId));
+      .where(and(eq(subscriptions.id, subscriptionId), eq(subscriptions.shopId, actor.shopId)));
     if (!current) throw new DomainError('Subscription not found');
     if (current.status === 'cancelled') {
       throw new DomainError('A cancelled subscription cannot be changed; create a new one');
@@ -319,7 +335,12 @@ export function createCustomer(db: DB, actor: Actor, input: CustomerInput) {
   return db.transaction(async (tx) => {
     const [customer] = await tx
       .insert(customers)
-      .values({ name: input.name, phone: input.phone ?? null, address: input.address ?? null })
+      .values({
+        shopId: actor.shopId,
+        name: input.name,
+        phone: input.phone ?? null,
+        address: input.address ?? null,
+      })
       .returning();
     await audit(tx, actor, 'customer.create', 'customer', customer.id, input);
     return customer;
@@ -331,6 +352,7 @@ export function createSupplier(db: DB, actor: Actor, input: SupplierInput) {
     const [supplier] = await tx
       .insert(suppliers)
       .values({
+        shopId: actor.shopId,
         name: input.name,
         phone: input.phone ?? null,
         defaultPricePerLitreCents: input.defaultPricePerLitre ?? null,

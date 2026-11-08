@@ -23,11 +23,11 @@ export default async function DashboardPage() {
   const isOwner = user.role === 'owner';
   const db = await getDb();
   const [dash, customers, suppliers, recent, salePrice] = await Promise.all([
-    getDashboard(db),
-    listCustomers(db),
-    listSuppliers(db),
-    listEntries(db, { limit: 8 }),
-    getLastSalePriceCents(db),
+    getDashboard(db, user.shopId),
+    listCustomers(db, user.shopId),
+    listSuppliers(db, user.shopId),
+    listEntries(db, user.shopId, { limit: 8 }),
+    getLastSalePriceCents(db, user.shopId),
   ]);
   const t = dash.todaySummary;
 

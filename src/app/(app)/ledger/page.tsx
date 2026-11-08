@@ -14,10 +14,10 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   const page = Math.max(1, Number((await searchParams).page) || 1);
   const db = await getDb();
   const [entries, customers, suppliers, salePrice] = await Promise.all([
-    listEntries(db, { limit: PAGE_SIZE + 1, offset: (page - 1) * PAGE_SIZE }),
-    listCustomers(db),
-    listSuppliers(db),
-    getLastSalePriceCents(db),
+    listEntries(db, user.shopId, { limit: PAGE_SIZE + 1, offset: (page - 1) * PAGE_SIZE }),
+    listCustomers(db, user.shopId),
+    listSuppliers(db, user.shopId),
+    getLastSalePriceCents(db, user.shopId),
   ]);
   const hasMore = entries.length > PAGE_SIZE;
 

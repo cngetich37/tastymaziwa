@@ -1,11 +1,14 @@
 /**
  * Read models for the UI. Aggregation happens in SQL; derived figures come
  * from the pure functions in src/lib/calc so they are unit-tested.
+ *
+ * Every query takes a `shopId` and filters by it: tenants never see each
+ * other's data. Joins stay within a shop because of the composite FKs.
  */
 import { and, desc, eq, gte, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DB } from '@/db/client';
-import { customers, ledgerEntries, subscriptions, suppliers, users } from '@/db/schema';
+import { customers, ledgerEntries, shops, subscriptions, suppliers, users } from '@/db/schema';
 import { allocatePayments, type AllocatedCreditSale } from '@/lib/calc/allocation';
 import {
   customerBalanceCents,
@@ -22,7 +25,7 @@ const sumAmount = sql<number>`coalesce(sum(${ledgerEntries.amountCents}), 0)`.ma
 const sumVolume = sql<number>`coalesce(sum(${ledgerEntries.volumeMl}), 0)`.mapWith(Number);
 
 /** Ledger totals grouped by kind and payment method, plus any extra group-by columns. */
-async function aggregate(db: DB, where?: SQL): Promise<LedgerRow[]> {
+async function aggregate(db: DB, shopId: string, where?: SQL): Promise<LedgerRow[]> {
   return db
     .select({
       kind: ledgerEntries.kind,
@@ -31,7 +34,7 @@ async function aggregate(db: DB, where?: SQL): Promise<LedgerRow[]> {
       volumeMl: sumVolume,
     })
     .from(ledgerEntries)
-    .where(where)
+    .where(and(eq(ledgerEntries.shopId, shopId), where))
     .groupBy(ledgerEntries.kind, ledgerEntries.paymentMethod);
 }
 
@@ -48,10 +51,10 @@ export interface Dashboard {
   activeSubscriptions: number;
 }
 
-export async function getDashboard(db: DB, today = todayBusinessDate()): Promise<Dashboard> {
+export async function getDashboard(db: DB, shopId: string, today = todayBusinessDate()): Promise<Dashboard> {
   const dates = lastNDates(7, today);
   const [todayRows, seriesRows, allTimeRows, [subs]] = await Promise.all([
-    aggregate(db, eq(ledgerEntries.businessDate, today)),
+    aggregate(db, shopId, eq(ledgerEntries.businessDate, today)),
     db
       .select({
         businessDate: ledgerEntries.businessDate,
@@ -61,13 +64,19 @@ export async function getDashboard(db: DB, today = todayBusinessDate()): Promise
         volumeMl: sumVolume,
       })
       .from(ledgerEntries)
-      .where(and(gte(ledgerEntries.businessDate, dates[0]), lte(ledgerEntries.businessDate, today)))
+      .where(
+        and(
+          eq(ledgerEntries.shopId, shopId),
+          gte(ledgerEntries.businessDate, dates[0]),
+          lte(ledgerEntries.businessDate, today),
+        ),
+      )
       .groupBy(ledgerEntries.businessDate, ledgerEntries.kind, ledgerEntries.paymentMethod),
-    aggregate(db),
+    aggregate(db, shopId),
     db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(subscriptions)
-      .where(eq(subscriptions.status, 'active')),
+      .where(and(eq(subscriptions.shopId, shopId), eq(subscriptions.status, 'active'))),
   ]);
 
   const allTime = summarize(allTimeRows);
@@ -105,6 +114,7 @@ export interface LedgerListItem {
 
 export async function listEntries(
   db: DB,
+  shopId: string,
   { limit = 50, offset = 0 }: { limit?: number; offset?: number } = {},
 ): Promise<LedgerListItem[]> {
   const reversal = alias(ledgerEntries, 'reversal');
@@ -131,6 +141,7 @@ export async function listEntries(
     .leftJoin(suppliers, eq(suppliers.id, ledgerEntries.supplierId))
     .leftJoin(users, eq(users.id, ledgerEntries.createdBy))
     .leftJoin(reversal, eq(reversal.reversesId, ledgerEntries.id))
+    .where(eq(ledgerEntries.shopId, shopId))
     .orderBy(desc(ledgerEntries.occurredAt), desc(ledgerEntries.createdAt))
     .limit(limit)
     .offset(offset);
@@ -147,9 +158,13 @@ export interface CustomerWithBalance {
   subscription: { id: string; dailyMl: number; pricePerLitreCents: number; status: string } | null;
 }
 
-export async function listCustomers(db: DB): Promise<CustomerWithBalance[]> {
+export async function listCustomers(db: DB, shopId: string): Promise<CustomerWithBalance[]> {
   const [rows, totals, subs] = await Promise.all([
-    db.select().from(customers).where(isNull(customers.archivedAt)).orderBy(customers.name),
+    db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.shopId, shopId), isNull(customers.archivedAt)))
+      .orderBy(customers.name),
     db
       .select({
         customerId: ledgerEntries.customerId,
@@ -159,12 +174,12 @@ export async function listCustomers(db: DB): Promise<CustomerWithBalance[]> {
         volumeMl: sumVolume,
       })
       .from(ledgerEntries)
-      .where(sql`${ledgerEntries.customerId} is not null`)
+      .where(and(eq(ledgerEntries.shopId, shopId), sql`${ledgerEntries.customerId} is not null`))
       .groupBy(ledgerEntries.customerId, ledgerEntries.kind, ledgerEntries.paymentMethod),
     db
       .select()
       .from(subscriptions)
-      .where(sql`${subscriptions.status} <> 'cancelled'`)
+      .where(and(eq(subscriptions.shopId, shopId), sql`${subscriptions.status} <> 'cancelled'`))
       .orderBy(desc(subscriptions.createdAt)),
   ]);
 
@@ -202,6 +217,7 @@ export interface OutstandingCredit extends AllocatedCreditSale {
  */
 export async function getOutstandingCredit(
   db: DB,
+  shopId: string,
   today = todayBusinessDate(),
 ): Promise<OutstandingCredit[]> {
   const reversal = alias(ledgerEntries, 'reversal');
@@ -222,6 +238,7 @@ export async function getOutstandingCredit(
       .leftJoin(reversal, eq(reversal.reversesId, ledgerEntries.id))
       .where(
         and(
+          eq(ledgerEntries.shopId, shopId),
           eq(ledgerEntries.kind, 'sale'),
           eq(ledgerEntries.paymentMethod, 'credit'),
           isNull(ledgerEntries.reversesId),
@@ -231,7 +248,7 @@ export async function getOutstandingCredit(
     db
       .select({ customerId: ledgerEntries.customerId, amountCents: sumAmount })
       .from(ledgerEntries)
-      .where(eq(ledgerEntries.kind, 'customer_payment'))
+      .where(and(eq(ledgerEntries.shopId, shopId), eq(ledgerEntries.kind, 'customer_payment')))
       .groupBy(ledgerEntries.customerId),
   ]);
 
@@ -266,9 +283,13 @@ export interface SupplierWithPayable {
   payableCents: number;
 }
 
-export async function listSuppliers(db: DB): Promise<SupplierWithPayable[]> {
+export async function listSuppliers(db: DB, shopId: string): Promise<SupplierWithPayable[]> {
   const [rows, totals] = await Promise.all([
-    db.select().from(suppliers).where(isNull(suppliers.archivedAt)).orderBy(suppliers.name),
+    db
+      .select()
+      .from(suppliers)
+      .where(and(eq(suppliers.shopId, shopId), isNull(suppliers.archivedAt)))
+      .orderBy(suppliers.name),
     db
       .select({
         supplierId: ledgerEntries.supplierId,
@@ -278,7 +299,7 @@ export async function listSuppliers(db: DB): Promise<SupplierWithPayable[]> {
         volumeMl: sumVolume,
       })
       .from(ledgerEntries)
-      .where(sql`${ledgerEntries.supplierId} is not null`)
+      .where(and(eq(ledgerEntries.shopId, shopId), sql`${ledgerEntries.supplierId} is not null`))
       .groupBy(ledgerEntries.supplierId, ledgerEntries.kind, ledgerEntries.paymentMethod),
   ]);
   const bySupplier = Map.groupBy(totals, (t) => t.supplierId);
@@ -294,12 +315,13 @@ export async function listSuppliers(db: DB): Promise<SupplierWithPayable[]> {
 // --- form defaults ----------------------------------------------------------
 
 /** Price of the most recent walk-in sale, so the sale form pre-fills sensibly. */
-export async function getLastSalePriceCents(db: DB, fallbackCents = 7000): Promise<number> {
+export async function getLastSalePriceCents(db: DB, shopId: string, fallbackCents = 7000): Promise<number> {
   const [row] = await db
     .select({ price: ledgerEntries.unitPriceCents })
     .from(ledgerEntries)
     .where(
       and(
+        eq(ledgerEntries.shopId, shopId),
         eq(ledgerEntries.kind, 'sale'),
         isNull(ledgerEntries.reversesId),
         isNull(ledgerEntries.subscriptionId),
@@ -308,4 +330,11 @@ export async function getLastSalePriceCents(db: DB, fallbackCents = 7000): Promi
     .orderBy(desc(ledgerEntries.occurredAt))
     .limit(1);
   return row?.price ?? fallbackCents;
+}
+
+// --- shop ---------------------------------------------------------------------
+
+export async function getShop(db: DB, shopId: string) {
+  const [shop] = await db.select().from(shops).where(eq(shops.id, shopId));
+  return shop ?? null;
 }

@@ -195,20 +195,86 @@ export const billSubscriptionsSchema = z.object({
 
 // --- auth -------------------------------------------------------------------
 
-export const loginSchema = z.object({
-  username: z.string().trim().toLowerCase().min(1, 'Username is required').max(64),
+/** Trimmed, lower-cased email (the sign-in identifier). */
+export const emailField = z
+  .string({ error: 'Email is required' })
+  .trim()
+  .toLowerCase()
+  .min(1, 'Email is required')
+  .max(254)
+  .pipe(z.email({ error: 'Enter a valid email address' }));
+
+export const PASSWORD_MIN = 10;
+
+export const newPasswordField = z
+  .string({ error: 'Password is required' })
+  .min(PASSWORD_MIN, `Use at least ${PASSWORD_MIN} characters`)
+  .max(200, 'That password is too long');
+
+/** 6-digit one-time code; spaces and dashes are ignored ("123 456"). */
+export const codeField = z
+  .string({ error: 'Enter the 6-digit code' })
+  .transform((v) => v.replace(/[\s-]/g, ''))
+  .pipe(z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'));
+
+const personName = z.string().trim().min(2, 'Enter your name').max(120);
+const shopName = z.string().trim().min(2, 'Enter your shop name').max(120);
+
+export const passwordLoginSchema = z.object({
+  email: emailField,
   password: z.string().min(1, 'Password is required').max(200),
 });
 
-export const newUserSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9._-]{3,32}$/, '3–32 characters: letters, numbers, . _ -'),
-  password: z.string().min(10, 'Use at least 10 characters').max(200),
+export const codeLoginSchema = z.object({ email: emailField, code: codeField });
+
+export const requestCodeSchema = z.object({ email: emailField });
+
+export const signupSchema = z.object({
+  shopName,
+  name: personName,
+  email: emailField,
+  password: newPasswordField,
+});
+
+export const forgotPasswordSchema = z.object({ email: emailField });
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(20, 'This reset link is invalid').max(200),
+    password: newPasswordField,
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    error: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().max(200),
+    password: newPasswordField,
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    error: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+export const requestEmailChangeSchema = z.object({ email: emailField });
+export const confirmEmailChangeSchema = z.object({ email: emailField, code: codeField });
+
+export const profileSchema = z.object({ name: personName });
+export const shopSchema = z.object({ name: shopName });
+
+export const inviteStaffSchema = z.object({
+  name: personName,
+  email: emailField,
   role: z.enum(['owner', 'attendant']),
+});
+
+export const userActiveSchema = z.object({
+  userId: id,
+  active: z.boolean(),
 });
 
 export type SaleInput = z.output<typeof saleSchema>;
@@ -220,4 +286,5 @@ export type SpoilageInput = z.output<typeof spoilageSchema>;
 export type CustomerInput = z.output<typeof customerSchema>;
 export type SupplierInput = z.output<typeof supplierSchema>;
 export type SubscriptionInput = z.output<typeof subscriptionSchema>;
-export type NewUserInput = z.output<typeof newUserSchema>;
+export type SignupInput = z.output<typeof signupSchema>;
+export type InviteStaffInput = z.output<typeof inviteStaffSchema>;
