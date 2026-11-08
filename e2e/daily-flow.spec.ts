@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { E2E_OWNER } from '../playwright.config';
-import { linkFrom, signInWithPassword as signIn, uniqueEmail, waitForMail } from './helpers';
+import { formReady, linkFrom, signInWithPassword as signIn, uniqueEmail, waitForMail } from './helpers';
 
 test('signed-out visitors are sent to the login page', async ({ page }) => {
   await page.goto('/credit');
@@ -9,6 +9,7 @@ test('signed-out visitors are sent to the login page', async ({ page }) => {
 
 test('wrong password is rejected', async ({ page }) => {
   await page.goto('/login');
+  await formReady(page, 'Sign in');
   await page.getByLabel('Email', { exact: true }).fill(E2E_OWNER.email);
   await page.getByLabel('Password', { exact: true }).fill('not-the-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -92,6 +93,7 @@ test('an invited attendant sets a password and cannot open settings', async ({ p
   // They follow the link in the invite email and choose a password.
   await page.goto(linkFrom(await waitForMail(email)));
   await expect(page.getByRole('heading', { name: 'Welcome! Set your password' })).toBeVisible();
+  await formReady(page, 'Save password');
   await page.getByLabel('New password', { exact: true }).fill('attendant-password');
   await page.getByLabel('Confirm new password').fill('attendant-password');
   await page.getByRole('button', { name: 'Save password' }).click();

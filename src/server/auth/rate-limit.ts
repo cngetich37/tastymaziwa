@@ -41,12 +41,21 @@ export async function pruneRateLimits(tx: Tx): Promise<void> {
 
 const WINDOW = 15 * 60;
 
+/**
+ * Emails per IP per window. Configurable because many people can share one IP
+ * (a shop's Wi-Fi, mobile carrier NAT) — and end-to-end tests all come from one.
+ */
+const emailsPerIp = () => {
+  const n = Number(process.env.RATE_LIMIT_EMAILS_PER_IP);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 15;
+};
+
 /** Policies, in one place. */
 export const limits = {
   /** Emails sent (codes, reset links, sign-up): per address and per IP. */
   sendEmail: (email: string, ip: string): Limit[] => [
     { key: `send:email:${email}`, max: 3, windowSeconds: WINDOW },
-    { key: `send:ip:${ip}`, max: 15, windowSeconds: WINDOW },
+    { key: `send:ip:${ip}`, max: emailsPerIp(), windowSeconds: WINDOW },
   ],
   /** Failed password sign-ins: lock the address (not the person) for a while. */
   loginFailures: (email: string): Limit => ({ key: `login-fail:${email}`, max: 5, windowSeconds: WINDOW }),

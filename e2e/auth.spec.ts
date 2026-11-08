@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { E2E_OWNER } from '../playwright.config';
-import { codeFrom, linkFrom, mailCount, signInWithPassword, signUpShop, uniqueEmail, waitForMail } from './helpers';
+import { codeFrom, formReady, linkFrom, mailCount, signInWithPassword, signUpShop, uniqueEmail, waitForMail } from './helpers';
 
 test('sign up creates a new, empty shop of your own', async ({ page }) => {
   const email = uniqueEmail('signup');
@@ -17,6 +17,7 @@ test('sign up creates a new, empty shop of your own', async ({ page }) => {
 test('a wrong sign-up code is rejected', async ({ page }) => {
   const email = uniqueEmail('badcode');
   await page.goto('/signup');
+  await formReady(page, 'Continue');
   await page.getByLabel('Shop name').fill('Wrong Code Dairy');
   await page.getByLabel('Your name').fill('Someone');
   await page.getByLabel('Email', { exact: true }).fill(email);
@@ -31,6 +32,7 @@ test('a wrong sign-up code is rejected', async ({ page }) => {
 
 test('passwordless: sign in with a code sent by email', async ({ page }) => {
   await page.goto('/login');
+  await formReady(page, 'Sign in');
   await page.getByRole('tab', { name: 'Email me a code' }).click();
   await page.getByLabel('Email', { exact: true }).fill(E2E_OWNER.email);
   const before = mailCount(E2E_OWNER.email);
@@ -51,6 +53,7 @@ test('forgot password: reset via the emailed link, then sign in', async ({ page 
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByRole('link', { name: 'Forgot password?' }).click();
+  await formReady(page, 'Email me a reset link');
   await page.getByLabel('Email', { exact: true }).fill(email);
   const before = mailCount(email);
   await page.getByRole('button', { name: 'Email me a reset link' }).click();
@@ -59,12 +62,14 @@ test('forgot password: reset via the emailed link, then sign in', async ({ page 
   const link = linkFrom(await waitForMail(email, { after: before }));
   await page.goto(link);
   await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
+  await formReady(page, 'Save password');
   await page.getByLabel('New password', { exact: true }).fill('brand-new-password');
   await page.getByLabel('Confirm new password').fill('brand-new-password');
   await page.getByRole('button', { name: 'Save password' }).click();
 
   await expect(page).toHaveURL(/\/login\?reset=1/);
   await expect(page.getByText('Password updated')).toBeVisible();
+  await formReady(page, 'Sign in');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill('original-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -78,6 +83,7 @@ test('forgot password: reset via the emailed link, then sign in', async ({ page 
 
 test('forgot password never reveals whether an account exists', async ({ page }) => {
   await page.goto('/forgot-password');
+  await formReady(page, 'Email me a reset link');
   await page.getByLabel('Email', { exact: true }).fill('nobody-here@e2e.test');
   await page.getByRole('button', { name: 'Email me a reset link' }).click();
   await expect(page.getByText(/If an account exists/)).toBeVisible();

@@ -38,8 +38,17 @@ export function mailCount(to: string, outbox = OUTBOX.main): number {
 export const codeFrom = (m: Mail) => /\b(\d{6})\b/.exec(m.text)?.[1] ?? '';
 export const linkFrom = (m: Mail) => /(https?:\/\/\S+token=\S+)/.exec(m.text)?.[1] ?? '';
 
+/**
+ * Wait until the form is hydrated (its submit button enables). Typing earlier
+ * races hydration, which resets controlled inputs.
+ */
+export async function formReady(page: Page, submit: string) {
+  await expect(page.getByRole('button', { name: submit, exact: true })).toBeEnabled();
+}
+
 export async function signInWithPassword(page: Page, email: string, password: string) {
   await page.goto('/login');
+  await formReady(page, 'Sign in');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -52,6 +61,7 @@ export const uniqueEmail = (label: string) => `${label}-${Date.now()}-${Math.flo
 /** Sign up a brand-new shop through the UI; ends signed in on Today. */
 export async function signUpShop(page: Page, opts: { shop: string; email: string; password: string }) {
   await page.goto('/signup');
+  await formReady(page, 'Continue');
   await page.getByLabel('Shop name').fill(opts.shop);
   await page.getByLabel('Your name').fill('New Owner');
   await page.getByLabel('Email', { exact: true }).fill(opts.email);

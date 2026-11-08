@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -178,9 +178,22 @@ export function ChoiceField({ name, label, options }: BaseProps & { options: Opt
   );
 }
 
+const noopSubscribe = () => () => {};
+
+/** False during server render and hydration, true once React owns the page. */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false);
+}
+
+/**
+ * Disabled until hydrated: on a slow phone the server-rendered form is visible
+ * before React attaches, and submitting then would send empty values (React
+ * resets the controlled inputs when it hydrates).
+ */
 export function SubmitButton({ pending, children }: { pending: boolean; children: ReactNode }) {
+  const hydrated = useHydrated();
   return (
-    <Button type="submit" disabled={pending} className="h-11 w-full text-base">
+    <Button type="submit" disabled={pending || !hydrated} className="h-11 w-full text-base">
       {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-label="Saving" /> : children}
     </Button>
   );

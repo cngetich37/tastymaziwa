@@ -25,6 +25,8 @@ function server(port: number, dir: string, outbox: string, env: Record<string, s
       // Production build, but emails go to a folder the tests can read.
       EMAIL_TRANSPORT: 'file',
       EMAIL_OUTBOX_DIR: outbox,
+      // Every test shares one IP; per-address limits still apply as normal.
+      RATE_LIMIT_EMAILS_PER_IP: '1000',
       ...env,
     },
   };
