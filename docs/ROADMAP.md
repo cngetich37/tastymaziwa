@@ -17,7 +17,7 @@ Mark each item done with `[x]` as it ships.
 - [x] **Audit log.** Every write records who did what and when, in the same transaction.
 
 **Follow-ups found during P0:**
-- [ ] Group the Credit page's unpaid list by customer. Subscription customers produce one row per day.
+- [x] Group the Credit page's unpaid list by customer. (Customers page: one row per customer, most overdue first.)
 - [ ] Turn on Cache Components (`cacheComponents: true`) once the data layer settles.
 - [x] Deactivate users from Settings; self-service password reset by email; change password/email on the Account page.
 - [ ] Archive customers and suppliers from the UI. The `archived_at` columns already exist.
@@ -33,6 +33,16 @@ Mark each item done with `[x]` as it ships.
 - [ ] Searchable customer picker (combobox) once shops have more than ~20 customers.
 - [ ] Swipe-down to dismiss bottom sheets.
 
+## Business flow: dedicated pages and roles
+
+- [x] **Pages follow the day.** Counter: Today → Sales → Deliveries (each per day, with a day picker for owners; deliveries split into morning and evening runs). People: Customers and Suppliers, each with a detail page and a statement with running balance. Books: Ledger and Settings.
+- [x] **Owner-set prices.** A shop selling price (Settings) and an agreed buying price per supplier. Attendants record litres only, at those prices; owners may override one entry's price. Price changes are audited with the old and new price.
+- [x] **Attendants: sales and deliveries only**, for today only, with no buying prices, costs or profit visible. Enforced in the services and covered by `server/pricing.test.ts`.
+- [x] **Owner setup checklist** on Today until the selling price and supplier prices are set.
+- [ ] Price history view (from the audit log) and scheduled price changes.
+- [ ] Per-customer prices (e.g. a wholesale rate for hotels and schools).
+- [ ] Shift handover for attendants: cash counted vs. cash expected, signed off by the owner.
+
 ## P1: Core business features
 
 ### Payments
@@ -43,14 +53,15 @@ Mark each item done with `[x]` as it ships.
 - [ ] **Payment method on every sale**: cash, M-Pesa or *deni* (credit). The daily close shows expected cash in the drawer against M-Pesa received.
 
 ### Credit (*deni*) management
-- [ ] **Customer ledger page.** Shows every purchase and payment, the running balance, and a shareable statement.
+- [x] **Customer ledger page.** Shows every purchase and payment and the running balance (`/customers/[id]`).
+- [ ] Shareable customer statement (link or PDF).
 - [ ] **Credit limits per customer.** Warn or block when a new credit sale would go over the limit.
 - [ ] **Ageing report** with buckets for current, 1–7, 8–30 and 30+ days, and a "top debtors" card on the dashboard.
 - [ ] **Automated reminders** by SMS (Africa's Talking) or WhatsApp (Business API with approved templates). Example: *"Habari Jane, salio lako TastyMaziwa ni KSh 850. Lipa kwa Till 123456."* The reminder includes a link that triggers STK Push.
 - [ ] **Partial payments** applied oldest-first, with a receipt.
 
 ### Supplier (milkman) side
-- [ ] **Supplier accounts.** Support several milkmen, each with deliveries, the price per litre, and payments made. Show the running payable.
+- [x] **Supplier accounts.** Support several milkmen, each with deliveries, the price per litre, and payments made. Show the running payable. (`/suppliers/[id]`)
 - [ ] **Delivery quality notes**, such as rejected litres or a failed lactometer reading, which reduce what is owed.
 - [ ] **Supplier statement** exportable as PDF to settle the weekly or monthly account.
 

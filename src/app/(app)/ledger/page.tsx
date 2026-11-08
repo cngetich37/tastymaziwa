@@ -12,7 +12,7 @@ import { requireUser } from '@/server/session';
 const PAGE_SIZE = 50;
 
 export default async function LedgerPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const user = await requireUser();
+  const user = await requireUser(['owner']);
   const page = Math.max(1, Number((await searchParams).page) || 1);
   const db = await getDb();
   const entries = await listEntries(db, user.shopId, { limit: PAGE_SIZE + 1, offset: (page - 1) * PAGE_SIZE });
@@ -35,7 +35,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       />
       <Card>
         <CardContent className="pt-6">
-          <EntryList entries={entries.slice(0, PAGE_SIZE)} canReverse={user.role === 'owner'} />
+          <EntryList entries={entries.slice(0, PAGE_SIZE)} canReverse />
           <div className="mt-4 flex justify-between">
             {page > 1 ? (
               <Button asChild variant="outline" className="h-11">

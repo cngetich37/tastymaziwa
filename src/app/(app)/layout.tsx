@@ -6,31 +6,34 @@ import { MobileHeader, MobileTabBar } from '@/components/shell/mobile-shell';
 import { SIDEBAR_COOKIE } from '@/components/shell/nav-items';
 import { getDb } from '@/db';
 import { authConfig } from '@/server/auth/config';
-import { getLastSalePriceCents, getShop, listCustomers, listSuppliers } from '@/server/queries';
+import { getShop, listCustomers, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const db = await getDb();
-  const [shop, customers, suppliers, salePrice, cookieStore] = await Promise.all([
+  const [shop, customers, suppliers, cookieStore] = await Promise.all([
     getShop(db, user.shopId),
     listCustomers(db, user.shopId),
     listSuppliers(db, user.shopId),
-    getLastSalePriceCents(db, user.shopId),
     cookies(),
   ]);
+  const isOwner = user.role === 'owner';
   const shopName = shop?.name ?? 'TastyMaziwa';
   const me = { name: user.name, role: user.role };
 
-  // Only what the entry forms need goes to the browser.
+  // Only what the entry forms need goes to the browser, and buying prices
+  // and payables only to owners: page data is readable by whoever holds it.
   const entryData = {
-    isOwner: user.role === 'owner',
-    defaultSalePriceCents: salePrice,
+    isOwner,
+    salePriceCents: shop?.salePricePerLitreCents ?? null,
     customers: customers.map((c) => ({ id: c.id, name: c.name, balanceCents: c.balanceCents })),
     suppliers: suppliers.map((s) => ({
       id: s.id,
       name: s.name,
-      defaultPricePerLitreCents: s.defaultPricePerLitreCents,
+      priceSet: s.defaultPricePerLitreCents != null,
+      defaultPricePerLitreCents: isOwner ? s.defaultPricePerLitreCents : null,
+      payableCents: isOwner ? s.payableCents : undefined,
     })),
   };
 

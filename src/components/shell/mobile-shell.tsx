@@ -8,7 +8,7 @@ import { Logo } from '@/components/logo';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { Avatar, SidebarBody, type ShellUser } from './app-sidebar';
-import { CREDIT, LEDGER, TODAY, isActive, type NavItem } from './nav-items';
+import { DELIVERIES, SALES, TODAY, isActive, type NavItem } from './nav-items';
 import { RecordDialog } from './record-dialog';
 
 /** Slim top bar on phones: which shop you're in, and your account. */
@@ -47,7 +47,7 @@ function Tab({ item, pathname }: { item: NavItem; pathname: string }) {
 }
 
 /**
- * Thumb-reach tab bar on phones: the three daily pages, a raised Record button
+ * Thumb-reach tab bar on phones: the counter pages, a raised Record button
  * in the middle, and Menu, which slides out the full sidebar.
  */
 export function MobileTabBar({ user, shopName }: { user: ShellUser; shopName: string }) {
@@ -61,7 +61,7 @@ export function MobileTabBar({ user, shopName }: { user: ShellUser; shopName: st
     >
       <ul className="grid grid-cols-5 items-end">
         <Tab item={TODAY} pathname={pathname} />
-        <Tab item={LEDGER} pathname={pathname} />
+        <Tab item={SALES} pathname={pathname} />
         <li className="flex justify-center">
           <RecordDialog
             trigger={
@@ -74,7 +74,7 @@ export function MobileTabBar({ user, shopName }: { user: ShellUser; shopName: st
             }
           />
         </li>
-        <Tab item={CREDIT} pathname={pathname} />
+        <Tab item={DELIVERIES} pathname={pathname} />
         <li>
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>

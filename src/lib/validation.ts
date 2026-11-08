@@ -108,7 +108,8 @@ export const SPOILAGE_REASONS = ['sour', 'spilled', 'power_outage', 'returned', 
 export const saleSchema = z
   .object({
     litres: litresField(),
-    pricePerLitre: kesField('Price per litre'),
+    /** Owner-only override; blank means the shop's selling price. */
+    pricePerLitre: optionalField(kesField('Price per litre')),
     paymentMethod: z.enum(PAYMENT_METHODS),
     customerId: optionalField(id),
     dueDate: optionalField(isoDate),
@@ -123,7 +124,8 @@ export const saleSchema = z
 export const deliverySchema = z.object({
   supplierId: id,
   litres: litresField(),
-  pricePerLitre: kesFieldAllowZero('Price per litre'),
+  /** Owner-only override; blank means the supplier's agreed price. */
+  pricePerLitre: optionalField(kesFieldAllowZero('Price per litre')),
   date: entryDate,
   note: optionalText(),
 });
@@ -175,6 +177,15 @@ export const supplierSchema = z.object({
   name: z.string().trim().min(2, 'Name is required').max(120),
   phone: phoneField,
   defaultPricePerLitre: optionalField(kesFieldAllowZero('Default price')),
+});
+
+export const updateCustomerSchema = customerSchema.extend({ customerId: id });
+
+export const updateSupplierSchema = supplierSchema.extend({ supplierId: id });
+
+/** The shop's selling price per litre (owner only). */
+export const salePriceSchema = z.object({
+  pricePerLitre: kesField('Selling price'),
 });
 
 export const subscriptionSchema = z.object({
@@ -292,6 +303,8 @@ export type ExpenseInput = z.output<typeof expenseSchema>;
 export type SpoilageInput = z.output<typeof spoilageSchema>;
 export type CustomerInput = z.output<typeof customerSchema>;
 export type SupplierInput = z.output<typeof supplierSchema>;
+export type UpdateCustomerInput = z.output<typeof updateCustomerSchema>;
+export type UpdateSupplierInput = z.output<typeof updateSupplierSchema>;
 export type SubscriptionInput = z.output<typeof subscriptionSchema>;
 export type SignupInput = z.output<typeof signupSchema>;
 export type InviteStaffInput = z.output<typeof inviteStaffSchema>;

@@ -13,10 +13,10 @@
 import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { createDb, migrateDb } from '../src/db/client';
-import { ledgerEntries, suppliers, users } from '../src/db/schema';
+import { ledgerEntries, shops, suppliers, users } from '../src/db/schema';
 import { addDays, todayBusinessDate } from '../src/lib/dates';
 import { lineTotalCents } from '../src/lib/money';
-import { createCustomer, createSubscription, createSupplier, type Actor } from '../src/server/ledger';
+import { createCustomer, createSubscription, createSupplier, setSalePrice, type Actor } from '../src/server/ledger';
 import { createShopWithOwner } from '../src/server/users';
 
 const demo = process.argv.includes('--demo');
@@ -54,6 +54,13 @@ try {
   if (!supplier) {
     supplier = await createSupplier(db, actor, { name: 'Milkman', defaultPricePerLitre: 5000 });
     console.log('Added default supplier "Milkman" at KSh 50/L.');
+  }
+
+  // --- selling price (attendants can't sell until the owner sets one) ------
+  const [shopRow] = await db.select().from(shops).where(eq(shops.id, shopId));
+  if (shopRow?.salePricePerLitreCents == null) {
+    await setSalePrice(db, actor, 7000);
+    console.log('Set the selling price to KSh 70/L.');
   }
 
   // --- demo trading --------------------------------------------------------

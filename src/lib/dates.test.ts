@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, daysBetween, lastNDates, toBusinessDate } from './dates';
+import { addDays, dayLabel, daysBetween, lastNDates, nairobiHour, parseDateParam, toBusinessDate } from './dates';
 
 describe('toBusinessDate', () => {
   it('uses Nairobi time, not UTC', () => {
@@ -22,5 +22,30 @@ describe('calendar arithmetic', () => {
   it('counts days between dates', () => {
     expect(daysBetween('2026-11-01', '2026-11-08')).toBe(7);
     expect(daysBetween('2026-11-08', '2026-11-01')).toBe(-7);
+  });
+});
+
+describe('day page helpers', () => {
+  const today = '2026-11-08';
+
+  it('parses a date parameter, falling back to today', () => {
+    expect(parseDateParam('2026-11-01', today)).toBe('2026-11-01');
+    expect(parseDateParam(undefined, today)).toBe(today);
+    expect(parseDateParam('yesterday', today)).toBe(today);
+    expect(parseDateParam('2026-02-30', today)).toBe(today);
+    expect(parseDateParam('2026-12-01', today)).toBe(today); // future
+    expect(parseDateParam(['2026-11-01'], today)).toBe(today);
+  });
+
+  it('labels days relative to today', () => {
+    expect(dayLabel(today, today)).toBe('Today');
+    expect(dayLabel('2026-11-07', today)).toBe('Yesterday');
+    expect(dayLabel('2026-11-01', today)).toBe('1 Nov 2026');
+  });
+
+  it('reads the hour in Nairobi time, whatever the server zone', () => {
+    expect(nairobiHour(new Date('2026-11-08T03:30:00Z'))).toBe(6);
+    expect(nairobiHour(new Date('2026-11-08T14:00:00Z'))).toBe(17);
+    expect(nairobiHour(new Date('2026-11-08T21:00:00Z'))).toBe(0);
   });
 });

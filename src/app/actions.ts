@@ -25,7 +25,10 @@ import {
   userRoleSchema,
   reverseEntrySchema,
   saleSchema,
+  salePriceSchema,
   spoilageSchema,
+  updateCustomerSchema,
+  updateSupplierSchema,
   subscriptionSchema,
   subscriptionStatusSchema,
   supplierPaymentSchema,
@@ -34,7 +37,9 @@ import {
 
 const idOnly = <T extends { id: string }>(row: T) => ({ id: row.id });
 
-// --- day-to-day entries (owner and attendant) ------------------------------
+// --- counter entries (owner and attendant) ----------------------------------
+// Attendants record quantities only: prices and dates are enforced in the
+// ledger services (see resolvePrice / entryDateFor), not just hidden in the UI.
 
 export const recordSaleAction = defineAction({ schema: saleSchema, roles: ANY_ROLE }, ({ db, actor }, input) =>
   ledger.recordSale(db, actor, input).then(idOnly),
@@ -45,27 +50,27 @@ export const recordDeliveryAction = defineAction(
   ({ db, actor }, input) => ledger.recordDelivery(db, actor, input).then(idOnly),
 );
 
+// --- owner only ---------------------------------------------------------------
+
 export const recordCustomerPaymentAction = defineAction(
-  { schema: customerPaymentSchema, roles: ANY_ROLE },
+  { schema: customerPaymentSchema, roles: OWNER },
   ({ db, actor }, input) => ledger.recordCustomerPayment(db, actor, input).then(idOnly),
 );
 
 export const recordSpoilageAction = defineAction(
-  { schema: spoilageSchema, roles: ANY_ROLE },
+  { schema: spoilageSchema, roles: OWNER },
   ({ db, actor }, input) => ledger.recordSpoilage(db, actor, input).then(idOnly),
 );
 
 export const createCustomerAction = defineAction(
-  { schema: customerSchema, roles: ANY_ROLE },
+  { schema: customerSchema, roles: OWNER },
   ({ db, actor }, input) => ledger.createCustomer(db, actor, input).then(idOnly),
 );
 
 export const billSubscriptionsAction = defineAction(
-  { schema: billSubscriptionsSchema, roles: ANY_ROLE },
+  { schema: billSubscriptionsSchema, roles: OWNER },
   ({ db, actor }, input) => ledger.billSubscriptions(db, actor, input.date),
 );
-
-// --- money out and corrections (owner only) --------------------------------
 
 export const recordSupplierPaymentAction = defineAction(
   { schema: supplierPaymentSchema, roles: OWNER },
@@ -80,6 +85,20 @@ export const recordExpenseAction = defineAction(
 export const reverseEntryAction = defineAction(
   { schema: reverseEntrySchema, roles: OWNER },
   ({ db, actor }, input) => ledger.reverseEntry(db, actor, input.entryId, input.reason).then(idOnly),
+);
+
+export const updateCustomerAction = defineAction(
+  { schema: updateCustomerSchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.updateCustomer(db, actor, input).then(idOnly),
+);
+
+export const updateSupplierAction = defineAction(
+  { schema: updateSupplierSchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.updateSupplier(db, actor, input).then(idOnly),
+);
+
+export const setSalePriceAction = defineAction({ schema: salePriceSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.setSalePrice(db, actor, input.pricePerLitre),
 );
 
 export const createSupplierAction = defineAction(

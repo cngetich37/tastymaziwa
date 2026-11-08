@@ -56,6 +56,8 @@ export const authTokenPurposeEnum = pgEnum('auth_token_purpose', [
 export const shops = pgTable('shops', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
+  /** The owner's selling price per litre. Attendants' sales always use it. */
+  salePricePerLitreCents: cents('sale_price_per_litre_cents'),
   createdAt: createdAt(),
 });
 

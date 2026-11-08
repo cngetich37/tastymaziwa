@@ -29,6 +29,13 @@
       "when": 1794126360125,
       "tag": "0003_drop_username",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794144315869,
+      "tag": "0004_shop_sale_price",
+      "breakpoints": true
     }
   ]
 }

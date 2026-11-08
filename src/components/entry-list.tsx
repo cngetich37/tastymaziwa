@@ -47,11 +47,14 @@ function cashEffect(e: LedgerListItem): number | null {
   }
 }
 
-function describe(e: LedgerListItem): string {
+/** Buying prices and delivery costs: owners only. */
+const isCost = (e: LedgerListItem) => e.kind === 'delivery' || e.kind === 'supplier_payment';
+
+function describe(e: LedgerListItem, hideCosts = false): string {
   const parts: string[] = [];
   if (e.volumeMl) {
     parts.push(
-      e.unitPriceCents != null
+      e.unitPriceCents != null && !(hideCosts && isCost(e))
         ? `${formatLitres(Math.abs(e.volumeMl))} @ ${formatKES(e.unitPriceCents)}`
         : formatLitres(Math.abs(e.volumeMl)),
     );
@@ -66,10 +69,13 @@ function describe(e: LedgerListItem): string {
 export function EntryList({
   entries,
   canReverse = false,
+  hideCosts = false,
   emptyText = 'Nothing recorded yet.',
 }: {
   entries: LedgerListItem[];
   canReverse?: boolean;
+  /** For attendants: deliveries show litres, never the buying price. */
+  hideCosts?: boolean;
   emptyText?: string;
 }) {
   const [target, setTarget] = useState<LedgerListItem | null>(null);
@@ -93,7 +99,7 @@ export function EntryList({
                   {isReversal && <Badge variant="outline">Reversal</Badge>}
                   {reversed && <Badge variant="secondary">Reversed</Badge>}
                 </div>
-                <p className="truncate text-sm text-muted-foreground">{describe(e)}</p>
+                <p className="truncate text-sm text-muted-foreground">{describe(e, hideCosts)}</p>
                 <p className="text-xs text-muted-foreground">
                   {formatShortDate(e.businessDate)} · {formatTime(new Date(e.occurredAt))}
                   {e.createdByName ? ` · ${e.createdByName}` : ''}
@@ -108,7 +114,9 @@ export function EntryList({
                     cash != null && cash < 0 && 'text-red-600 dark:text-red-400',
                   )}
                 >
-                  {cash != null
+                  {hideCosts && isCost(e)
+                    ? formatLitres(e.volumeMl)
+                    : cash != null
                     ? formatKESSigned(cash)
                     : e.amountCents
                       ? formatKES(e.amountCents)

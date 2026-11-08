@@ -51,7 +51,8 @@ npm run db:studio      # browse the database
 ```
 src/
   app/
-    (app)/            signed-in pages: / (Today), /ledger, /credit, /account, /settings (owner)
+    (app)/            signed-in pages: / (Today), /sales, /deliveries (per day, ?date= for owners),
+                      /customers[/id], /suppliers[/id], /ledger, /settings (owner), /account
     (auth)/           signed-out pages: /login, /signup, /forgot-password, /reset-password
     actions.ts        signed-in server actions, each wrapped in defineAction
     auth-actions.ts   signed-out server actions (definePublicAction): sign-up, codes, reset
@@ -148,7 +149,8 @@ The database enforces these rules. Don't work around them:
 - Signed-out actions go in `src/app/auth-actions.ts` with `definePublicAction`, and must rate-limit.
 - Business-rule failures throw `DomainError`; its message is shown to the user. Anything else is logged and gets a generic error.
 - **Route handlers only for external callers** (cron, future M-Pesa callbacks). They do their own auth: a bearer secret compared with `timingSafeEqual`, or a signature check.
-- Roles: an **attendant** can record sales, deliveries, customer payments and spoilage, add customers, and bill subscriptions. An **owner** can additionally see profit and record expenses and supplier payments. Owners also reverse entries and manage suppliers, subscriptions and users.
+- Roles: an **attendant** records sales and deliveries only: litres, payment method and (for credit) the customer, dated today. Prices come from the owner: the shop's selling price (`shops.sale_price_per_litre_cents`, set in Settings) and each supplier's agreed price. Attendants never see buying prices, delivery costs, profit, customers' or suppliers' pages, or the ledger. An **owner** does everything else: sets prices (and may override the price of one entry), records payments, spoilage and expenses, dates entries on past days, reverses entries, and manages customers, suppliers, subscriptions and users.
+- **Prices and dates are enforced in the services** (`resolvePrice` / `entryDateFor` in `server/ledger.ts`), not only hidden in the UI. Page data for attendants must not carry costs either (see `app/(app)/layout.tsx`).
 
 ### Reading data
 - Pages are async Server Components. Start with `const user = await requireUser()` (or `requireUser(['owner'])`), then `const db = await getDb()`, then call `src/server/queries.ts` with `user.shopId`. Pass plain data to client components.

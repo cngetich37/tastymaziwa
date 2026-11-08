@@ -1,11 +1,12 @@
-import { AddSupplierButton, InviteStaffButton } from '@/components/dialog-buttons';
+import Link from 'next/link';
+import { InviteStaffButton } from '@/components/dialog-buttons';
+import { SalePriceForm } from '@/components/forms/entry-forms';
 import { PageHeader } from '@/components/page-header';
 import { ShopNameForm, TeamMemberMenu } from '@/components/forms/account-forms';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDb } from '@/db';
-import { formatKES } from '@/lib/money';
-import { getShop, listSuppliers } from '@/server/queries';
+import { getShop } from '@/server/queries';
 import { requireUser } from '@/server/session';
 import { listUsers } from '@/server/users';
 
@@ -14,15 +15,11 @@ export const metadata = { title: 'Settings · TastyMaziwa' };
 export default async function SettingsPage() {
   const me = await requireUser(['owner']);
   const db = await getDb();
-  const [shop, suppliers, users] = await Promise.all([
-    getShop(db, me.shopId),
-    listSuppliers(db, me.shopId),
-    listUsers(db, me.shopId),
-  ]);
+  const [shop, users] = await Promise.all([getShop(db, me.shopId), listUsers(db, me.shopId)]);
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageHeader title="Settings" description="Your shop, suppliers and team." />
+      <PageHeader title="Settings" description="Your shop, prices and team." />
 
       <Card>
         <CardHeader>
@@ -36,36 +33,18 @@ export default async function SettingsPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <div>
-              <CardTitle>Suppliers</CardTitle>
-              <CardDescription>Who you buy milk from, and what you owe them.</CardDescription>
-            </div>
-            <AddSupplierButton />
+          <CardHeader>
+            <CardTitle>Selling price</CardTitle>
+            <CardDescription>
+              Attendants sell at this price and can&apos;t change it. Buying prices are set per supplier on the{' '}
+              <Link href="/suppliers" className="underline underline-offset-2">
+                Suppliers
+              </Link>{' '}
+              page.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {suppliers.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No suppliers yet.</p>
-            ) : (
-              <ul className="divide-y">
-                {suppliers.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between gap-3 py-3">
-                    <div>
-                      <p className="font-medium">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {[s.phone, s.defaultPricePerLitreCents != null && `${formatKES(s.defaultPricePerLitreCents)}/L`]
-                          .filter(Boolean)
-                          .join(' · ') || '—'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-sm font-medium tabular-nums">{formatKES(s.payableCents)}</p>
-                      <p className="text-xs text-muted-foreground">owed</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <SalePriceForm priceCents={shop?.salePricePerLitreCents ?? null} />
           </CardContent>
         </Card>
 

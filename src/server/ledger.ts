@@ -9,6 +9,7 @@ import {
   auditLog,
   customers,
   ledgerEntries,
+  shops,
   subscriptions,
   suppliers,
   type LedgerEntry,
@@ -27,6 +28,8 @@ import type {
   SubscriptionInput,
   SupplierInput,
   SupplierPaymentInput,
+  UpdateCustomerInput,
+  UpdateSupplierInput,
 } from '@/lib/validation';
 
 /**
@@ -50,6 +53,21 @@ export class DomainError extends Error {
 }
 
 const DEFAULT_CREDIT_DAYS = 7;
+
+/**
+ * Owners (and the system) set prices and may date entries on another day.
+ * Attendants record quantities at the owner's prices, for today only: the
+ * same rules a till applies to cashiers ("manager override").
+ */
+const isManager = (actor: Actor) => actor.role === 'owner' || actor.role === 'system';
+
+function entryDateFor(actor: Actor, date: BusinessDate | undefined): BusinessDate {
+  const today = todayBusinessDate();
+  if (date && date !== today && !isManager(actor)) {
+    throw new DomainError('Only the owner can record entries for another day');
+  }
+  return date ?? today;
+}
 
 async function audit(
   tx: Tx,
@@ -94,25 +112,57 @@ async function assertCustomer(tx: Tx, actor: Actor, customerId: string) {
 
 async function assertSupplier(tx: Tx, actor: Actor, supplierId: string) {
   const [row] = await tx
-    .select({ id: suppliers.id })
+    .select({ id: suppliers.id, name: suppliers.name, price: suppliers.defaultPricePerLitreCents, archivedAt: suppliers.archivedAt })
     .from(suppliers)
     .where(and(eq(suppliers.id, supplierId), eq(suppliers.shopId, actor.shopId)));
   if (!row) throw new DomainError('Supplier not found');
+  if (row.archivedAt) throw new DomainError('That supplier has been archived');
+  return row;
+}
+
+async function shopSalePrice(tx: Tx, actor: Actor): Promise<number | null> {
+  const [row] = await tx
+    .select({ price: shops.salePricePerLitreCents })
+    .from(shops)
+    .where(eq(shops.id, actor.shopId));
+  return row?.price ?? null;
+}
+
+/**
+ * The price an entry is recorded at. A manager may type a different price
+ * for one entry; anyone else always gets the price on file.
+ */
+function resolvePrice(
+  actor: Actor,
+  requested: number | undefined,
+  onFile: number | null,
+  missing: { manager: string; staff: string },
+): number {
+  if (requested != null && requested !== onFile) {
+    if (!isManager(actor)) throw new DomainError('Only the owner can change prices');
+    return requested;
+  }
+  if (onFile == null) throw new DomainError(isManager(actor) ? missing.manager : missing.staff);
+  return onFile;
 }
 
 // --- ledger entries ---------------------------------------------------------
 
 export function recordSale(db: DB, actor: Actor, input: SaleInput) {
   return db.transaction(async (tx) => {
-    const businessDate = input.date ?? todayBusinessDate();
+    const businessDate = entryDateFor(actor, input.date);
     if (input.customerId) await assertCustomer(tx, actor, input.customerId);
+    const price = resolvePrice(actor, input.pricePerLitre, await shopSalePrice(tx, actor), {
+      manager: 'Set your selling price in Settings first, or type a price',
+      staff: 'The owner has not set a selling price yet',
+    });
     const isCredit = input.paymentMethod === 'credit';
     return insertEntry(tx, actor, {
       kind: 'sale',
       businessDate,
       volumeMl: input.litres,
-      unitPriceCents: input.pricePerLitre,
-      amountCents: lineTotalCents(input.litres, input.pricePerLitre),
+      unitPriceCents: price,
+      amountCents: lineTotalCents(input.litres, price),
       paymentMethod: input.paymentMethod,
       customerId: input.customerId ?? null,
       dueDate: isCredit ? (input.dueDate ?? addDays(businessDate, DEFAULT_CREDIT_DAYS)) : null,
@@ -123,13 +173,18 @@ export function recordSale(db: DB, actor: Actor, input: SaleInput) {
 
 export function recordDelivery(db: DB, actor: Actor, input: DeliveryInput) {
   return db.transaction(async (tx) => {
-    await assertSupplier(tx, actor, input.supplierId);
+    const businessDate = entryDateFor(actor, input.date);
+    const supplier = await assertSupplier(tx, actor, input.supplierId);
+    const price = resolvePrice(actor, input.pricePerLitre, supplier.price, {
+      manager: `Set ${supplier.name}'s price per litre first, or type a price`,
+      staff: `The owner has not set ${supplier.name}'s price per litre yet`,
+    });
     return insertEntry(tx, actor, {
       kind: 'delivery',
-      businessDate: input.date ?? todayBusinessDate(),
+      businessDate,
       volumeMl: input.litres,
-      unitPriceCents: input.pricePerLitre,
-      amountCents: lineTotalCents(input.litres, input.pricePerLitre),
+      unitPriceCents: price,
+      amountCents: lineTotalCents(input.litres, price),
       supplierId: input.supplierId,
       note: input.note,
     });
@@ -141,7 +196,7 @@ export function recordCustomerPayment(db: DB, actor: Actor, input: CustomerPayme
     await assertCustomer(tx, actor, input.customerId);
     return insertEntry(tx, actor, {
       kind: 'customer_payment',
-      businessDate: input.date ?? todayBusinessDate(),
+      businessDate: entryDateFor(actor, input.date),
       amountCents: input.amount,
       paymentMethod: input.paymentMethod,
       customerId: input.customerId,
@@ -155,7 +210,7 @@ export function recordSupplierPayment(db: DB, actor: Actor, input: SupplierPayme
     await assertSupplier(tx, actor, input.supplierId);
     return insertEntry(tx, actor, {
       kind: 'supplier_payment',
-      businessDate: input.date ?? todayBusinessDate(),
+      businessDate: entryDateFor(actor, input.date),
       amountCents: input.amount,
       paymentMethod: input.paymentMethod,
       supplierId: input.supplierId,
@@ -168,7 +223,7 @@ export function recordExpense(db: DB, actor: Actor, input: ExpenseInput) {
   return db.transaction((tx) =>
     insertEntry(tx, actor, {
       kind: 'expense',
-      businessDate: input.date ?? todayBusinessDate(),
+      businessDate: entryDateFor(actor, input.date),
       amountCents: input.amount,
       expenseCategory: input.category,
       note: input.note,
@@ -180,7 +235,7 @@ export function recordSpoilage(db: DB, actor: Actor, input: SpoilageInput) {
   return db.transaction((tx) =>
     insertEntry(tx, actor, {
       kind: 'spoilage',
-      businessDate: input.date ?? todayBusinessDate(),
+      businessDate: entryDateFor(actor, input.date),
       volumeMl: input.litres,
       expenseCategory: input.reason,
       note: input.note,
@@ -360,5 +415,50 @@ export function createSupplier(db: DB, actor: Actor, input: SupplierInput) {
       .returning();
     await audit(tx, actor, 'supplier.create', 'supplier', supplier.id, input);
     return supplier;
+  });
+}
+
+export function updateCustomer(db: DB, actor: Actor, input: UpdateCustomerInput) {
+  return db.transaction(async (tx) => {
+    const [customer] = await tx
+      .update(customers)
+      .set({ name: input.name, phone: input.phone ?? null, address: input.address ?? null })
+      .where(and(eq(customers.id, input.customerId), eq(customers.shopId, actor.shopId)))
+      .returning();
+    if (!customer) throw new DomainError('Customer not found');
+    await audit(tx, actor, 'customer.update', 'customer', customer.id, input);
+    return customer;
+  });
+}
+
+export function updateSupplier(db: DB, actor: Actor, input: UpdateSupplierInput) {
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select({ price: suppliers.defaultPricePerLitreCents })
+      .from(suppliers)
+      .where(and(eq(suppliers.id, input.supplierId), eq(suppliers.shopId, actor.shopId)));
+    if (!before) throw new DomainError('Supplier not found');
+    const [supplier] = await tx
+      .update(suppliers)
+      .set({ name: input.name, phone: input.phone ?? null, defaultPricePerLitreCents: input.defaultPricePerLitre ?? null })
+      .where(and(eq(suppliers.id, input.supplierId), eq(suppliers.shopId, actor.shopId)))
+      .returning();
+    await audit(tx, actor, 'supplier.update', 'supplier', supplier.id, {
+      ...input,
+      previousPricePerLitreCents: before.price,
+    });
+    return supplier;
+  });
+}
+
+/** The selling price every attendant sale uses. Past sales keep their own price. */
+export function setSalePrice(db: DB, actor: Actor, pricePerLitreCents: number) {
+  return db.transaction(async (tx) => {
+    const previous = await shopSalePrice(tx, actor);
+    await tx.update(shops).set({ salePricePerLitreCents: pricePerLitreCents }).where(eq(shops.id, actor.shopId));
+    await audit(tx, actor, 'shop.sale_price', 'shop', actor.shopId, {
+      from: previous,
+      to: pricePerLitreCents,
+    });
   });
 }

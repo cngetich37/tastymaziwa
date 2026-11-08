@@ -24,7 +24,7 @@ test('activity keeps the session alive past the idle timeout', async ({ page }) 
   // Navigate every 2s for ~2x the idle timeout: each request slides the expiry.
   for (let elapsed = 0; elapsed < EXPIRY_IDLE_SECONDS * 2000; elapsed += 2000) {
     await page.waitForTimeout(2000);
-    await page.getByRole('link', { name: elapsed % 4000 ? 'Today' : 'Ledger' }).first().click();
+    await page.getByRole('link', { name: elapsed % 4000 ? 'Today' : 'Sales' }).first().click();
   }
   await expect(page).not.toHaveURL(/\/login/);
 });

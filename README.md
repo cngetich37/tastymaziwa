@@ -110,7 +110,7 @@ The database enforces the rules itself, so a bug can't quietly corrupt the books
 ```
 src/
 ├── app/
-│   ├── (app)/            # signed-in pages: Today, Ledger, Credit, Account, Settings
+│   ├── (app)/            # signed-in pages: Today, Sales, Deliveries, Customers, Suppliers, Ledger, Settings, Account
 │   ├── (auth)/           # sign in, sign up, forgot and reset password
 │   ├── actions.ts        # signed-in Server Actions: authenticated, role-checked, validated
 │   ├── auth-actions.ts   # signed-out actions: sign-up, codes, password reset (rate-limited)

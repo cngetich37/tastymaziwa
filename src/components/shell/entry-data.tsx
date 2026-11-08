@@ -11,7 +11,8 @@ import type { CustomerOption, SupplierOption } from '@/components/forms/entry-fo
 export interface EntryData {
   customers: CustomerOption[];
   suppliers: SupplierOption[];
-  defaultSalePriceCents: number;
+  /** The owner's selling price; null until it is set in Settings. */
+  salePriceCents: number | null;
   isOwner: boolean;
 }
 

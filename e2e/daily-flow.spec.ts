@@ -55,7 +55,7 @@ test('owner records a delivery and a cash sale, then reverses the sale', async (
 test('credit sales show up as money owed', async ({ page }) => {
   await signIn(page, E2E_OWNER.email, E2E_OWNER.password);
 
-  await page.goto('/credit');
+  await page.goto('/customers');
   await page.getByRole('button', { name: 'Customer' }).click();
   await page.getByLabel('Name').fill('Jane Achieng');
   await page.getByLabel('Phone (optional)').fill('0712 345 678');
@@ -72,11 +72,37 @@ test('credit sales show up as money owed', async ({ page }) => {
   await page.getByRole('button', { name: 'Record sale' }).click();
   await expect(page.getByText('Sale recorded').first()).toBeVisible();
 
-  await page.goto('/credit');
+  await page.goto('/customers');
   await expect(page.getByText('Customers owe you Ksh 210')).toBeVisible();
+
+  // Her statement shows the sale and the running balance.
+  await page.getByRole('link', { name: /Jane Achieng/ }).click();
+  await expect(page.getByRole('heading', { name: 'Jane Achieng' })).toBeVisible();
+  await expect(page.getByText('Bought 3 L @ Ksh 70, on credit')).toBeVisible();
+  await expect(page.getByText('Owes Ksh 210')).toBeVisible();
 });
 
-test('an invited attendant sets a password and cannot open settings', async ({ page }) => {
+test('owner changes the selling price; the sale form uses it', async ({ page }) => {
+  await signIn(page, E2E_OWNER.email, E2E_OWNER.password);
+  await page.goto('/settings');
+  await formReady(page, 'Save price');
+  await page.getByLabel('Selling price / litre').fill('75');
+  await page.getByRole('button', { name: 'Save price' }).click();
+  await expect(page.getByText('Selling price saved').first()).toBeVisible();
+
+  await page.goto('/sales');
+  await page.getByRole('button', { name: 'New sale' }).click();
+  await expect(page.getByLabel('Price / litre')).toHaveValue('75.00');
+
+  // Put it back for the other tests.
+  await page.goto('/settings');
+  await formReady(page, 'Save price');
+  await page.getByLabel('Selling price / litre').fill('70');
+  await page.getByRole('button', { name: 'Save price' }).click();
+  await expect(page.getByText('Selling price saved').first()).toBeVisible();
+});
+
+test("an invited attendant records sales and deliveries at the owner's prices only", async ({ page }) => {
   const email = uniqueEmail('attendant');
   // The owner invites them by email.
   await signIn(page, E2E_OWNER.email, E2E_OWNER.password);
@@ -102,9 +128,34 @@ test('an invited attendant sets a password and cannot open settings', async ({ p
   await signIn(page, email, 'attendant-password');
   await expect(page.getByRole('banner')).toContainText('E2E Dairy');
   await expect(page.getByText('Net profit today')).toHaveCount(0);
+  await expect(page.getByText('Selling at Ksh 70 per litre')).toBeVisible();
+
+  // A sale: litres and payment only; the price is fixed.
+  await page.getByRole('button', { name: 'Sale', exact: true }).click();
+  await expect(page.getByLabel('Price / litre')).toHaveCount(0);
+  await page.getByRole('button', { name: '2 L' }).click();
+  await expect(page.getByText('Total: Ksh 140')).toBeVisible();
+  await page.getByRole('button', { name: 'Record sale' }).click();
+  await expect(page.getByText('Sale recorded').first()).toBeVisible();
+
+  // A delivery: litres only, and no buying price anywhere.
+  await page.getByRole('button', { name: 'Delivery in' }).click();
+  await expect(page.getByLabel('Cost / litre')).toHaveCount(0);
+  await page.getByLabel('Litres received').fill('10');
+  await page.getByRole('button', { name: 'Record delivery' }).click();
+  await expect(page.getByText('Delivery recorded').first()).toBeVisible();
+  await page.goto('/deliveries');
+  await expect(page.getByText('10 L').first()).toBeVisible();
+  await expect(page.getByText('Ksh 50')).toHaveCount(0);
+
+  // Owner-only pages are out of reach.
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0);
-  await page.goto('/settings');
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('link', { name: 'Customers' })).toHaveCount(0);
+  for (const path of ['/settings', '/customers', '/suppliers', '/ledger']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/$/);
+  }
 });
 
 test('owner resends an invite and promotes a team member to owner', async ({ page }) => {

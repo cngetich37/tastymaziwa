@@ -23,7 +23,7 @@ export function StatCard({
           <p className="text-sm text-muted-foreground">{label}</p>
           <p
             className={cn(
-              'mt-1 truncate text-2xl font-bold tabular-nums',
+              'mt-1 truncate text-xl font-bold tabular-nums sm:text-2xl',
               tone === 'positive' && 'text-green-700 dark:text-green-400',
               tone === 'negative' && 'text-red-600 dark:text-red-400',
               tone === 'warning' && 'text-amber-600 dark:text-amber-400',
@@ -33,7 +33,7 @@ export function StatCard({
           </p>
           {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
         </div>
-        <div className="rounded-full bg-primary/10 p-2 text-primary">
+        <div className="rounded-full bg-primary/10 p-2 text-primary max-sm:hidden">
           <Icon className="h-5 w-5" aria-hidden />
         </div>
       </CardContent>
