@@ -1,7 +1,19 @@
-# Settings to manage and configure a Firebase App Hosting backend.
+# Firebase App Hosting backend configuration.
 # https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
+  # Increase to spin up more instances under load.
   maxInstances: 1
+
+env:
+  # App Hosting's filesystem is ephemeral: production MUST use hosted Postgres.
+  # Create secrets with: firebase apphosting:secrets:set <NAME>
+  - variable: DATABASE_URL
+    secret: DATABASE_URL
+  - variable: AUTH_SECRET
+    secret: AUTH_SECRET
+  - variable: CRON_SECRET
+    secret: CRON_SECRET
+  # Auth.js runs behind Google's proxy, so trust the forwarded host header.
+  - variable: AUTH_TRUST_HOST
+    value: "true"

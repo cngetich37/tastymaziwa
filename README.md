@@ -1,5 +1,23 @@
-# Firebase Studio
+# TastyMaziwa
 
-This is a NextJS starter in Firebase Studio.
+Daily milk sales, credit (*deni*) and profit for a Kenyan maziwa shop. It's built mobile-first, for one attendant on an Android phone.
 
-To get started, take a look at src/app/page.tsx.
+## Quick start
+
+```bash
+npm install
+cp .env.example .env.local        # then set AUTH_SECRET (npx auth secret)
+npm run db:seed -- --demo         # prints the owner password once
+npm run dev                       # http://localhost:9002
+```
+
+No database server is needed locally: it runs on embedded Postgres (PGlite) in `.data/`. In production, set `DATABASE_URL` and run `npm run db:migrate`.
+
+## Checks
+
+```bash
+npm run lint && npm run typecheck && npm test
+npm run build && npm run test:e2e
+```
+
+Read `CLAUDE.md` for architecture and conventions, and `docs/ROADMAP.md` for what's next.
