@@ -1,8 +1,8 @@
 'use client';
 
-import { useSyncExternalStore, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
+import { Loader2, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   FormControl,
@@ -20,7 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useHydrated } from '@/hooks/use-hydrated';
 import { cn } from '@/lib/utils';
+
+export { useHydrated };
 
 interface BaseProps {
   name: string;
@@ -55,6 +58,18 @@ const inputProps: Record<InputKind, React.InputHTMLAttributes<HTMLInputElement>>
 
 const suffixes: Partial<Record<InputKind, string>> = { money: 'KSh', litres: 'L' };
 
+/** A one-tap value under an input, e.g. "1 L" or "Full balance". */
+export interface Preset {
+  label: string;
+  value: string;
+}
+
+const chipClass = (selected: boolean) =>
+  cn(
+    'h-11 min-w-14 rounded-full border px-4 text-sm font-medium tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+    selected ? 'border-primary bg-primary/10 text-primary' : 'border-input bg-background hover:bg-muted',
+  );
+
 export function TextField({
   name,
   label,
@@ -62,8 +77,9 @@ export function TextField({
   kind = 'text',
   placeholder,
   autoFocus,
-}: BaseProps & { kind?: InputKind; placeholder?: string; autoFocus?: boolean }) {
-  const { control } = useFormContext();
+  presets,
+}: BaseProps & { kind?: InputKind; placeholder?: string; autoFocus?: boolean; presets?: Preset[] }) {
+  const { control, setValue } = useFormContext();
   const suffix = suffixes[kind];
   return (
     <FormField
@@ -89,6 +105,20 @@ export function TextField({
               </span>
             )}
           </div>
+          {presets && presets.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {presets.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={chipClass(field.value === p.value)}
+                  onClick={() => setValue(name, p.value, { shouldValidate: true, shouldDirty: true })}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
           {description && <FormDescription>{description}</FormDescription>}
           <FormMessage />
         </FormItem>
@@ -100,6 +130,7 @@ export function TextField({
 export interface Option {
   value: string;
   label: string;
+  icon?: LucideIcon;
 }
 
 export function SelectField({
@@ -160,12 +191,14 @@ export function ChoiceField({ name, label, options }: BaseProps & { options: Opt
                   aria-checked={selected}
                   onClick={() => field.onChange(o.value)}
                   className={cn(
-                    'h-11 rounded-md border text-sm font-medium transition-colors',
+                    'flex min-h-11 items-center justify-center gap-2 rounded-lg border px-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                    o.icon && 'min-h-14 flex-col gap-1',
                     selected
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-input bg-background hover:bg-muted',
                   )}
                 >
+                  {o.icon && <o.icon className="size-5" aria-hidden />}
                   {o.label}
                 </button>
               );
@@ -178,13 +211,6 @@ export function ChoiceField({ name, label, options }: BaseProps & { options: Opt
   );
 }
 
-const noopSubscribe = () => () => {};
-
-/** False during server render and hydration, true once React owns the page. */
-export function useHydrated(): boolean {
-  return useSyncExternalStore(noopSubscribe, () => true, () => false);
-}
-
 /**
  * Disabled until hydrated: on a slow phone the server-rendered form is visible
  * before React attaches, and submitting then would send empty values (React
@@ -194,7 +220,13 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
   const hydrated = useHydrated();
   return (
     <Button type="submit" disabled={pending || !hydrated} className="h-11 w-full text-base">
-      {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-label="Saving" /> : children}
+      {pending ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Saving…
+        </>
+      ) : (
+        children
+      )}
     </Button>
   );
 }

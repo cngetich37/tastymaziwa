@@ -1,5 +1,6 @@
 'use client';
 
+import { Banknote, NotebookPen, Smartphone } from 'lucide-react';
 import { Form } from '@/components/ui/form';
 import {
   createCustomerAction,
@@ -29,7 +30,7 @@ import {
   supplierPaymentSchema,
   supplierSchema,
 } from '@/lib/validation';
-import { ChoiceField, SelectField, SubmitButton, TextField, type Option } from './fields';
+import { ChoiceField, SelectField, SubmitButton, TextField, type Option, type Preset } from './fields';
 import { useActionForm } from './use-action-form';
 
 export interface CustomerOption {
@@ -59,24 +60,40 @@ const customerOptions = (customers: CustomerOption[]): Option[] =>
   }));
 
 const IMMEDIATE_METHODS: Option[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'mpesa', label: 'M-Pesa' },
+  { value: 'cash', label: 'Cash', icon: Banknote },
+  { value: 'mpesa', label: 'M-Pesa', icon: Smartphone },
 ];
+const SALE_METHODS: Option[] = [...IMMEDIATE_METHODS, { value: 'credit', label: 'Credit (deni)', icon: NotebookPen }];
 
-/** Live "litres × price" total, or null while the inputs are incomplete. */
-function previewTotal(litres: unknown, price: unknown): string | null {
+/** The usual counter quantities: one tap instead of typing. */
+const litrePresets = (values: string[]): Preset[] =>
+  values.map((v) => ({ value: v, label: `${v === '0.5' ? '½' : v} L` }));
+
+/** Live "litres × price" total in cents, or null while the inputs are incomplete. */
+function previewTotalCents(litres: unknown, price: unknown): number | null {
   try {
     if (typeof litres !== 'string' || typeof price !== 'string' || !litres || !price) return null;
-    return formatKES(lineTotalCents(litresToMl(litres), kesToCents(price)));
+    return lineTotalCents(litresToMl(litres), kesToCents(price));
   } catch {
     return null;
   }
 }
 
-function TotalLine({ value }: { value: string | null }) {
+function TotalLine({ cents, detail }: { cents: number | null; detail?: string | null }) {
   return (
-    <p className="rounded-md bg-muted px-3 py-2 text-sm" aria-live="polite">
-      Total: <span className="font-semibold">{value ?? '—'}</span>
+    <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3" aria-live="polite">
+      <p className="flex items-baseline justify-between gap-3 text-sm text-muted-foreground">
+        Total: <span className="text-2xl font-bold text-foreground tabular-nums">{cents == null ? '—' : formatKES(cents)}</span>
+      </p>
+      {detail && <p className="mt-1 text-right text-xs text-muted-foreground">{detail}</p>}
+    </div>
+  );
+}
+
+function NoSuppliers() {
+  return (
+    <p className="rounded-lg bg-muted px-4 py-6 text-center text-sm text-muted-foreground">
+      Add the milkman you buy from in <strong>Settings → Suppliers</strong> first.
     </p>
   );
 }
@@ -101,20 +118,16 @@ export function SaleForm({
     },
     { success: 'Sale recorded', onSuccess: onDone },
   );
-  const [litres, price, method] = form.watch(['litres', 'pricePerLitre', 'paymentMethod']);
+  const [litres, price, method, customerId] = form.watch(['litres', 'pricePerLitre', 'paymentMethod', 'customerId']);
+  const total = previewTotalCents(litres, price);
+  const customer = method === 'credit' ? customers.find((c) => c.id === customerId) : undefined;
 
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
-        <div className="grid grid-cols-2 gap-3">
-          <TextField name="litres" label="Litres" kind="litres" autoFocus />
-          <TextField name="pricePerLitre" label="Price / litre" kind="money" />
-        </div>
-        <ChoiceField
-          name="paymentMethod"
-          label="Paid by"
-          options={[...IMMEDIATE_METHODS, { value: 'credit', label: 'Credit (deni)' }]}
-        />
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <TextField name="litres" label="Litres" kind="litres" autoFocus presets={litrePresets(['0.5', '1', '2', '5'])} />
+        <TextField name="pricePerLitre" label="Price / litre" kind="money" />
+        <ChoiceField name="paymentMethod" label="Paid by" options={SALE_METHODS} />
         {method === 'credit' && (
           <>
             <SelectField name="customerId" label="Customer" options={customerOptions(customers)} />
@@ -126,7 +139,10 @@ export function SaleForm({
             />
           </>
         )}
-        <TotalLine value={previewTotal(litres, price)} />
+        <TotalLine
+          cents={total}
+          detail={customer && total != null ? `${customer.name} will owe ${formatKES(customer.balanceCents + total)}` : null}
+        />
         <SubmitButton pending={pending}>Record sale</SubmitButton>
       </form>
     </Form>
@@ -150,12 +166,12 @@ export function DeliveryForm({ suppliers, onDone }: FormProps & { suppliers: Sup
   const [litres, price] = form.watch(['litres', 'pricePerLitre']);
 
   if (suppliers.length === 0) {
-    return <p className="text-sm text-muted-foreground">Add a supplier in Settings first.</p>;
+    return <NoSuppliers />;
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         {suppliers.length > 1 && (
           <SelectField
             name="supplierId"
@@ -167,7 +183,7 @@ export function DeliveryForm({ suppliers, onDone }: FormProps & { suppliers: Sup
           <TextField name="litres" label="Litres received" kind="litres" autoFocus />
           <TextField name="pricePerLitre" label="Cost / litre" kind="money" />
         </div>
-        <TotalLine value={previewTotal(litres, price)} />
+        <TotalLine cents={previewTotalCents(litres, price)} />
         <SubmitButton pending={pending}>Record delivery</SubmitButton>
       </form>
     </Form>
@@ -183,8 +199,8 @@ export function SpoilageForm({ onDone }: FormProps) {
   );
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
-        <TextField name="litres" label="Litres lost" kind="litres" autoFocus />
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <TextField name="litres" label="Litres lost" kind="litres" autoFocus presets={litrePresets(['0.5', '1', '2'])} />
         <SelectField name="reason" label="Reason" options={toOptions(SPOILAGE_REASONS)} />
         <TextField name="note" label="Note (optional)" />
         <SubmitButton pending={pending}>Record spoilage</SubmitButton>
@@ -206,11 +222,18 @@ export function CustomerPaymentForm({
     { customerId: defaultCustomerId ?? '', amount: '', paymentMethod: 'mpesa', note: '' },
     { success: 'Payment received', onSuccess: onDone },
   );
+  const selected = customers.find((c) => c.id === form.watch('customerId'));
+  const owed = selected && selected.balanceCents > 0 ? selected.balanceCents : 0;
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <SelectField name="customerId" label="Customer" options={customerOptions(customers)} />
-        <TextField name="amount" label="Amount paid" kind="money" />
+        <TextField
+          name="amount"
+          label="Amount paid"
+          kind="money"
+          presets={owed ? [{ value: centsToKesString(owed), label: `Full balance · ${formatKES(owed)}` }] : undefined}
+        />
         <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
         <SubmitButton pending={pending}>Record payment</SubmitButton>
       </form>
@@ -225,9 +248,10 @@ export function SupplierPaymentForm({ suppliers, onDone }: FormProps & { supplie
     { supplierId: suppliers[0]?.id ?? '', amount: '', paymentMethod: 'cash', note: '' },
     { success: 'Supplier payment recorded', onSuccess: onDone },
   );
+  if (suppliers.length === 0) return <NoSuppliers />;
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <SelectField
           name="supplierId"
           label="Supplier"
@@ -250,7 +274,7 @@ export function ExpenseForm({ onDone }: FormProps) {
   );
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <SelectField name="category" label="Category" options={toOptions(EXPENSE_CATEGORIES)} />
         <TextField name="amount" label="Amount" kind="money" />
         <TextField name="note" label="Note (optional)" />
@@ -271,7 +295,7 @@ export function CustomerForm({ onDone }: FormProps) {
   );
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <TextField name="name" label="Name" autoFocus />
         <TextField name="phone" label="Phone (optional)" kind="tel" placeholder="0712 345 678" />
         <TextField name="address" label="Location (optional)" />
@@ -299,7 +323,7 @@ export function SubscriptionForm({
   );
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <SelectField name="customerId" label="Customer" options={customerOptions(customers)} />
         <div className="grid grid-cols-2 gap-3">
           <TextField name="dailyLitres" label="Litres per day" kind="litres" />
@@ -321,7 +345,7 @@ export function SupplierForm({ onDone }: FormProps) {
   );
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <TextField name="name" label="Name" />
         <TextField name="phone" label="Phone (optional)" kind="tel" />
         <TextField name="defaultPricePerLitre" label="Usual price / litre (optional)" kind="money" />
@@ -340,7 +364,7 @@ export function InviteStaffForm({ onDone }: FormProps) {
   );
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <TextField name="name" label="Full name" />
         <TextField
           name="email"

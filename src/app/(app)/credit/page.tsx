@@ -1,4 +1,5 @@
 import { AddCustomerButton, AddSubscriptionButton, ReceivePaymentButton } from '@/components/dialog-buttons';
+import { PageHeader } from '@/components/page-header';
 import { SubscriptionStatusButtons } from '@/components/subscription-actions';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,15 +22,17 @@ export default async function CreditPage() {
   const totalOwed = customers.reduce((sum, c) => sum + Math.max(0, c.balanceCents), 0);
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Credit</h1>
-        <p className="text-sm text-muted-foreground">
-          Customers owe you <span className="font-semibold text-foreground">{formatKES(totalOwed)}</span>
-        </p>
-      </div>
+    <div className="grid grid-cols-1 gap-6">
+      <PageHeader
+        title="Credit"
+        description={
+          <>
+            Customers owe you <span className="font-semibold text-foreground">{formatKES(totalOwed)}</span>
+          </>
+        }
+      />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Unpaid credit sales</CardTitle>

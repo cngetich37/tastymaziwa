@@ -28,6 +28,10 @@ export function useActionForm<S extends z.ZodType<FieldValues, FieldValues>, T>(
     // Explicit type arguments select the zod 4 overload for a generic schema.
     resolver: zodResolver<FieldValues, unknown, FieldValues, S>(schema),
     defaultValues: defaultValues as DefaultValues<z.input<S>>,
+    // Validate on submit, then live while fixing (react-hook-form's default).
+    // Not on blur: forms sit in bottom sheets, and an error appearing on blur
+    // grows the sheet upwards mid-tap, so the tap misses its button.
+    mode: 'onSubmit',
   });
   const [pending, startTransition] = useTransition();
 

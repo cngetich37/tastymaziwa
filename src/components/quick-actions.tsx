@@ -1,68 +1,38 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { Droplets, HandCoins, ShoppingCart, Truck, type LucideIcon } from 'lucide-react';
-import { FormDialog } from '@/components/form-dialog';
-import {
-  CustomerPaymentForm,
-  DeliveryForm,
-  SaleForm,
-  SpoilageForm,
-  type CustomerOption,
-  type SupplierOption,
-} from '@/components/forms/entry-forms';
+import { actionsFor, RecordDialog, type EntryAction } from '@/components/shell/record-dialog';
+import { cn } from '@/lib/utils';
 
-function ActionTile({ icon: Icon, label, ...props }: { icon: LucideIcon; label: string }) {
+function ActionTile({ action, primary, ...props }: { action: EntryAction; primary: boolean }) {
+  const Icon = action.icon;
   return (
     <button
       type="button"
       {...props}
-      className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border bg-card p-3 text-sm font-medium shadow-xs transition-colors hover:border-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className={cn(
+        'flex min-h-24 flex-col items-start justify-between gap-2 rounded-xl border p-4 text-left shadow-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+        primary
+          ? 'col-span-2 min-h-16 flex-row items-center justify-start gap-3 border-primary bg-primary text-primary-foreground hover:bg-primary/90 sm:col-span-1 sm:min-h-24 sm:flex-col sm:items-start sm:justify-between'
+          : 'bg-card hover:border-primary hover:bg-primary/5',
+      )}
     >
-      <Icon className="h-6 w-6 text-primary" aria-hidden />
-      {label}
+      <Icon className={cn('size-6', !primary && 'text-primary')} aria-hidden />
+      <span className="text-base font-semibold">{action.label}</span>
     </button>
   );
 }
 
-function Tile({ icon, label, title, children }: {
-  icon: LucideIcon;
-  label: string;
-  title: string;
-  children: (close: () => void) => ReactNode;
-}) {
-  return (
-    <FormDialog trigger={<ActionTile icon={icon} label={label} />} title={title}>
-      {children}
-    </FormDialog>
-  );
-}
-
-export function QuickActions({
-  customers,
-  suppliers,
-  defaultSalePriceCents,
-}: {
-  customers: CustomerOption[];
-  suppliers: SupplierOption[];
-  defaultSalePriceCents: number;
-}) {
+/** The four counter actions, one tap from Today. Sale, the most common, stands out. */
+export function QuickActions() {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Tile icon={ShoppingCart} label="Sale" title="Record a sale">
-        {(close) => (
-          <SaleForm customers={customers} defaultPriceCents={defaultSalePriceCents} onDone={close} />
-        )}
-      </Tile>
-      <Tile icon={Truck} label="Delivery in" title="Milk received">
-        {(close) => <DeliveryForm suppliers={suppliers} onDone={close} />}
-      </Tile>
-      <Tile icon={HandCoins} label="Payment in" title="Customer payment">
-        {(close) => <CustomerPaymentForm customers={customers} onDone={close} />}
-      </Tile>
-      <Tile icon={Droplets} label="Spoilage" title="Milk lost or spoiled">
-        {(close) => <SpoilageForm onDone={close} />}
-      </Tile>
+      {actionsFor(false).map((action, i) => (
+        <RecordDialog
+          key={action.kind}
+          initial={action.kind}
+          trigger={<ActionTile action={action} primary={i === 0} />}
+        />
+      ))}
     </div>
   );
 }

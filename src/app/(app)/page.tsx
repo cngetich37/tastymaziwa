@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Banknote, Droplet, HandCoins, TrendingUp, Truck } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
 import { ProfitChart } from '@/components/profit-chart';
 import { QuickActions } from '@/components/quick-actions';
 import { StatCard } from '@/components/stat-card';
@@ -9,36 +10,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { getDb } from '@/db';
 import { formatLongDate } from '@/lib/dates';
 import { formatKES, formatLitres } from '@/lib/money';
-import {
-  getDashboard,
-  getLastSalePriceCents,
-  listCustomers,
-  listEntries,
-  listSuppliers,
-} from '@/server/queries';
+import { getDashboard, listEntries } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const isOwner = user.role === 'owner';
   const db = await getDb();
-  const [dash, customers, suppliers, recent, salePrice] = await Promise.all([
+  const [dash, recent] = await Promise.all([
     getDashboard(db, user.shopId),
-    listCustomers(db, user.shopId),
-    listSuppliers(db, user.shopId),
     listEntries(db, user.shopId, { limit: 8 }),
-    getLastSalePriceCents(db, user.shopId),
   ]);
   const t = dash.todaySummary;
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
-        <p className="text-sm text-muted-foreground">{formatLongDate(dash.today)}</p>
-      </div>
+    <div className="grid grid-cols-1 gap-6">
+      <PageHeader title="Today" description={formatLongDate(dash.today)} />
 
-      <QuickActions customers={customers} suppliers={suppliers} defaultSalePriceCents={salePrice} />
+      <QuickActions />
 
       {dash.activeSubscriptions > 0 && (
         <div className="flex flex-wrap items-center gap-3">
@@ -87,7 +76,7 @@ export default async function DashboardPage() {
       </section>
 
       {isOwner && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Net profit, last 7 days</CardTitle>

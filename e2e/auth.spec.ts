@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { E2E_OWNER } from '../playwright.config';
-import { codeFrom, formReady, linkFrom, mailCount, signInWithPassword, signUpShop, uniqueEmail, waitForMail } from './helpers';
+import { codeFrom, formReady, linkFrom, mailCount, signInWithPassword, signUpShop, uniqueEmail, waitForMail, signOut } from './helpers';
 
 test('sign up creates a new, empty shop of your own', async ({ page }) => {
   const email = uniqueEmail('signup');
@@ -49,7 +49,7 @@ test('passwordless: sign in with a code sent by email', async ({ page }) => {
 test('forgot password: reset via the emailed link, then sign in', async ({ page }) => {
   const email = uniqueEmail('forgot');
   await signUpShop(page, { shop: 'Forgetful Dairy', email, password: 'original-password' });
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByRole('link', { name: 'Forgot password?' }).click();

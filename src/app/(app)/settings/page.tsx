@@ -1,4 +1,5 @@
 import { AddSupplierButton, InviteStaffButton } from '@/components/dialog-buttons';
+import { PageHeader } from '@/components/page-header';
 import { ShopNameForm, TeamMemberMenu } from '@/components/forms/account-forms';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,20 +21,20 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="grid gap-6">
-      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+    <div className="grid grid-cols-1 gap-6">
+      <PageHeader title="Settings" description="Your shop, suppliers and team." />
 
       <Card>
         <CardHeader>
           <CardTitle>Shop</CardTitle>
-          <CardDescription>Shown in the header and in emails to your team.</CardDescription>
+          <CardDescription>Shown in the menu and in emails to your team.</CardDescription>
         </CardHeader>
         <CardContent>
           <ShopNameForm name={shop?.name ?? ''} />
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div>

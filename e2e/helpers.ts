@@ -73,3 +73,10 @@ export async function signUpShop(page: Page, opts: { shop: string; email: string
   await page.getByRole('button', { name: 'Create my shop' }).click();
   await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
 }
+
+/** Sign out from the phone layout: it lives in the Menu drawer. */
+export async function signOut(page: Page) {
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/login/);
+}

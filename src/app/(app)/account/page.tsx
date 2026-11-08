@@ -1,4 +1,5 @@
 import { ChangeEmailForm, ChangePasswordForm, ProfileForm } from '@/components/forms/account-forms';
+import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDb } from '@/db';
 import { requireUser } from '@/server/session';
@@ -12,12 +13,9 @@ export default async function AccountPage() {
   if (!user) return null;
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Your account</h1>
-        <p className="text-sm capitalize text-muted-foreground">{user.role}</p>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6">
+      <PageHeader title="Your account" description={<span className="capitalize">{user.role}</span>} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>

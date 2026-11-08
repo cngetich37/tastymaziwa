@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { E2E_OWNER } from '../playwright.config';
-import { formReady, linkFrom, signInWithPassword as signIn, uniqueEmail, waitForMail } from './helpers';
+import { formReady, linkFrom, signInWithPassword as signIn, uniqueEmail, waitForMail, signOut } from './helpers';
 
 test('signed-out visitors are sent to the login page', async ({ page }) => {
   await page.goto('/credit');
@@ -87,7 +87,7 @@ test('an invited attendant sets a password and cannot open settings', async ({ p
   await page.getByRole('button', { name: 'Send invite' }).click();
   await expect(page.getByText(email)).toBeVisible();
   await expect(page.getByText('Invited', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/login/);
 
   // They follow the link in the invite email and choose a password.
@@ -130,7 +130,7 @@ test('owner resends an invite and promotes a team member to owner', async ({ pag
   await page.getByRole('button', { name: 'Actions for Rising Star' }).click();
   await page.getByRole('menuitem', { name: 'Make owner' }).click();
   await expect(page.getByText('Rising Star is now an owner').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/login/);
 
   // The first link no longer works; the resent one does.

@@ -25,6 +25,14 @@ Mark each item done with `[x]` as it ships.
 - [ ] Regenerate the remaining unused shadcn components with the current CLI, or delete them.
 - [x] Migrate zod 3 → 4 (clears the last production `npm audit` advisory).
 
+## UX: app shell and forms
+
+- [x] **Sidebar navigation.** On desktop, a left sidebar holds the shop, a **Record** button, nav groups (Shop / Manage), the theme and the account menu. It collapses to an icon rail (Ctrl+B), and the server remembers the state in a cookie. On phones, a bottom tab bar (Today, Ledger, raised **Record**, Credit, Menu) keeps navigation in thumb reach, and Menu slides out the full sidebar.
+- [x] **Record from anywhere.** One dialog covers every ledger entry ("What happened?" then the form). The layout loads the customer and supplier pickers once, so it works on every page.
+- [x] **Better forms.** Dialogs become bottom sheets on phones. Litre quick-pick chips (½, 1, 2, 5 L) make a cash sale three taps. Payment-method buttons have icons, payments have a "Full balance" chip, the live total is large, a credit sale shows the customer's new balance, and the button shows "Saving…" while it works. The keyboard no longer covers sheets on Android (`interactive-widget=resizes-content`).
+- [ ] Searchable customer picker (combobox) once shops have more than ~20 customers.
+- [ ] Swipe-down to dismiss bottom sheets.
+
 ## P1: Core business features
 
 ### Payments
