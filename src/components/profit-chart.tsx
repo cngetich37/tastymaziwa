@@ -1,44 +1,45 @@
 'use client';
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
-import type { ProfitData } from '@/lib/types';
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { formatShortDate } from '@/lib/dates';
+import { formatKES } from '@/lib/money';
+import type { DailyPoint } from '@/lib/calc/summary';
 
-interface ProfitChartProps {
-  data: ProfitData[];
-}
+const compactKES = new Intl.NumberFormat('en-KE', { notation: 'compact', maximumFractionDigits: 1 });
 
-export function ProfitChart({ data }: ProfitChartProps) {
+export function ProfitChart({ data }: { data: DailyPoint[] }) {
+  const rows = data.map((d) => ({ label: formatShortDate(d.date), profit: d.netProfitCents / 100 }));
   return (
-    <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-            <XAxis
-                dataKey="date"
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-            />
-            <YAxis
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `KES ${value/1000}k`}
-            />
-            <Tooltip
-                contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                    color: 'hsl(var(--card-foreground))'
-                }}
-                labelStyle={{ fontWeight: 'bold' }}
-                itemStyle={{ color: 'hsl(var(--chart-4))' }}
-                formatter={(value: number) => [`KES ${value.toLocaleString()}`, 'Profit']}
-                cursor={{ fill: 'hsl(var(--primary) / 0.1)' }}
-            />
-            <Bar dataKey="profit" fill="hsl(var(--chart-4))" radius={[4, 4, 0, 0]} />
+    <div className="h-56 w-full" role="img" aria-label="Net profit per day for the last 7 days">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} margin={{ top: 8, right: 4, left: -12, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="var(--color-border)" />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} stroke="var(--color-muted-foreground)" />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            fontSize={12}
+            width={48}
+            stroke="var(--color-muted-foreground)"
+            tickFormatter={(v: number) => compactKES.format(v)}
+          />
+          <Tooltip
+            cursor={{ fill: 'var(--color-muted)' }}
+            contentStyle={{
+              background: 'var(--color-popover)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 8,
+              color: 'var(--color-popover-foreground)',
+            }}
+            formatter={(value) => [formatKES(Math.round(Number(value) * 100)), 'Net profit']}
+          />
+          <Bar dataKey="profit" radius={[4, 4, 0, 0]}>
+            {rows.map((r) => (
+              <Cell key={r.label} fill={r.profit < 0 ? 'var(--color-red-500, #ef4444)' : 'var(--color-primary)'} />
+            ))}
+          </Bar>
         </BarChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+    </div>
   );
 }
