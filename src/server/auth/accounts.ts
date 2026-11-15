@@ -15,6 +15,7 @@ import { auditLog, authTokens, shops, suppliers, users, type Role } from '@/db/s
 import type { InviteStaffInput, InviteSupplierInput, SignupInput } from '@/lib/validation';
 import { DomainError, type Actor } from '../ledger';
 import { demoOff, isDemoShop } from '../demo/guard';
+import { copyDemoSetup } from '../demo/keep';
 import { dummyVerify, hashPassword, verifyPassword } from '../password';
 import { appUrl, authConfig } from './config';
 import * as emails from './emails';
@@ -61,10 +62,17 @@ interface PendingSignup {
   shopName: string;
   name: string;
   passwordHash: string;
+  /** "Keep what I added": the demo shop the visitor was signed in to (server-side only). */
+  fromDemoShopId?: string;
 }
 
 /** Step 1: email a code. The account only exists once the code is entered. */
-export async function requestSignup(db: DB, input: SignupInput, ip: string): Promise<{ ok: boolean }> {
+export async function requestSignup(
+  db: DB,
+  input: SignupInput,
+  ip: string,
+  opts: { fromDemoShopId?: string } = {},
+): Promise<{ ok: boolean }> {
   if (!(await consume(db, limits.sendEmail(input.email, ip)))) return { ok: false };
 
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
@@ -79,6 +87,7 @@ export async function requestSignup(db: DB, input: SignupInput, ip: string): Pro
     shopName: input.shopName,
     name: input.name,
     passwordHash: await hashPassword(input.password),
+    ...(opts.fromDemoShopId ? { fromDemoShopId: opts.fromDemoShopId } : {}),
   };
   await issueToken(db, {
     purpose: 'signup',
@@ -120,6 +129,19 @@ export async function completeSignup(db: DB, email: string, code: string): Promi
       entityId: shop.id,
       data: { name: shop.name, via: 'signup' },
     });
+    if (pending.fromDemoShopId) {
+      const kept = await copyDemoSetup(tx, pending.fromDemoShopId, shop.id);
+      if (kept) {
+        await tx.insert(auditLog).values({
+          shopId: shop.id,
+          userId: user.id,
+          action: 'shop.keep_demo',
+          entityType: 'shop',
+          entityId: shop.id,
+          data: kept,
+        });
+      }
+    }
     return user;
   });
 }

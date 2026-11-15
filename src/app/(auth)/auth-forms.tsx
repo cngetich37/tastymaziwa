@@ -13,7 +13,7 @@ import {
   requestSignupAction,
   resetPasswordAction,
 } from '@/app/auth-actions';
-import { SubmitButton, TextField } from '@/components/forms/fields';
+import { CheckboxField, SubmitButton, TextField } from '@/components/forms/fields';
 import { Form } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { ActionResult } from '@/lib/action-result';
@@ -226,13 +226,17 @@ function CodeLogin() {
 
 // --- sign up -------------------------------------------------------------------------
 
-export function SignupForm() {
+/**
+ * `fromDemo`: the visitor is signed in to a demo shop. `keep` describes what
+ * they added there ("2 customers and your selling price"), or null if nothing.
+ */
+export function SignupForm({ fromDemo = null }: { fromDemo?: { keep: string | null } | null }) {
   const router = useRouter();
   const [pendingSignup, setPendingSignup] = useState<z.input<typeof signupSchema> | null>(null);
   const { pending, error, setError, run } = useSubmit();
   const form = useForm<z.input<typeof signupSchema>, unknown, z.output<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { shopName: '', name: '', email: '', password: '' },
+    defaultValues: { shopName: '', name: '', email: '', password: '', keepDemo: fromDemo?.keep != null },
   });
 
   const request = (raw: z.input<typeof signupSchema>) =>
@@ -285,13 +289,29 @@ export function SignupForm() {
         <TextField name="name" label="Your name" />
         <TextField name="email" label="Email" kind="email" />
         <TextField name="password" label="Password" kind="password" description="At least 10 characters." />
+        {fromDemo?.keep && (
+          <CheckboxField
+            name="keepDemo"
+            label="Keep what I added in the demo"
+            description={`${fromDemo.keep}. The sample customers, suppliers and all trading stay behind.`}
+          />
+        )}
         <SubmitButton pending={pending}>Continue</SubmitButton>
-        <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link href="/login" className="font-medium text-primary underline-offset-2 hover:underline">
-            Sign in
-          </Link>
-        </p>
+        {fromDemo ? (
+          <p className="text-center text-sm text-muted-foreground">
+            Not ready yet?{' '}
+            <Link href="/" className="font-medium text-primary underline-offset-2 hover:underline">
+              Back to the demo
+            </Link>
+          </p>
+        ) : (
+          <p className="text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium text-primary underline-offset-2 hover:underline">
+              Sign in
+            </Link>
+          </p>
+        )}
       </form>
     </Form>
   );

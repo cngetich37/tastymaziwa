@@ -85,7 +85,8 @@ src/
     notify/           whatsapp.ts (Cloud API template sender; dev outbox), stock-alerts.ts
                       (owner's stock updates; run from actions with after(), never in the transaction)
     demo/             "Try the demo": demo.ts (sandbox shop per visitor, signed sign-in tokens,
-                      role switching, purge), data.ts (the sample trading), guard.ts (isDemoShop:
+                      role switching, purge), data.ts (the sample trading), keep.ts (sign-up from a
+                      demo copies what the visitor added, found via audit log), guard.ts (isDemoShop:
                       services that email, prompt M-Pesa or WhatsApp refuse demo shops)
     users.ts, password.ts
   lib/                isomorphic and pure: safe on the client

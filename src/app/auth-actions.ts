@@ -7,6 +7,8 @@
 import { z } from 'zod';
 import { definePublicAction } from '@/server/action';
 import { startDemo } from '@/server/demo/demo';
+import { isDemoShop } from '@/server/demo/guard';
+import { currentUser } from '@/server/session';
 import {
   requestLoginCode,
   requestPasswordReset,
@@ -32,7 +34,10 @@ export const startDemoAction = definePublicAction(z.object({}), async ({ db, ip 
 });
 
 export const requestSignupAction = definePublicAction(signupSchema, async ({ db, ip }, input) => {
-  const { ok } = await requestSignup(db, input, ip);
+  // "Keep what I added" only means something for someone signed in to a demo shop.
+  const user = input.keepDemo ? await currentUser() : null;
+  const fromDemoShopId = user && (await isDemoShop(db, user.shopId)) ? user.shopId : undefined;
+  const { ok } = await requestSignup(db, input, ip, { fromDemoShopId });
   return ok ? { ok: true, data: { email: input.email } } : { ok: false, error: TOO_MANY };
 });
 

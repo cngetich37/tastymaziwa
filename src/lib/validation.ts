@@ -459,6 +459,8 @@ export const signupSchema = z.object({
   name: personName,
   email: emailField,
   password: newPasswordField,
+  /** From the demo shop: start with what the visitor added there (server checks the session). */
+  keepDemo: z.boolean().optional(),
 });
 
 export const forgotPasswordSchema = z.object({ email: emailField });

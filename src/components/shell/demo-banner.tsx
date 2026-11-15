@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { signIn, signOut } from 'next-auth/react';
+import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 import { demoSwitchRoleAction } from '@/app/actions';
 import type { Role } from '@/db/schema';
 import { ROLE_LABELS, homeFor } from '@/lib/roles';
@@ -74,13 +75,9 @@ export function DemoBanner({ role, hoursLeft }: { role: Role; hoursLeft: number 
           {error}
         </p>
       )}
-      <button
-        type="button"
-        onClick={() => signOut({ redirectTo: '/signup' })}
-        className="justify-self-start font-medium text-primary underline-offset-2 hover:underline"
-      >
+      <Link href="/signup" className="justify-self-start font-medium text-primary underline-offset-2 hover:underline">
         Ready? Create your own shop →
-      </button>
+      </Link>
     </aside>
   );
 }
