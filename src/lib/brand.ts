@@ -41,3 +41,18 @@ export const LOGO_SHAPES: ReadonlyArray<{ d: string; fill: LogoFill; stroke?: bo
   // The milk wave.
   { d: 'M8.6 19.4c2.5-1.5 4.9-1.5 7.4 0s4.9 1.5 7.4 0v2.9c-2.5 1.5-4.9 1.5-7.4 0s-4.9-1.5-7.4 0z', fill: 'blue' },
 ];
+
+/**
+ * The churn simplified for small sizes (the in-app logo at 32px, favicons):
+ * no handles or lid rim, a short neck under an overhanging lid (what makes
+ * it a churn and not a jar), and one bold wave, so it stays readable at 16px. The detailed LOGO_SHAPES are for home-screen icons.
+ */
+export const LOGO_SHAPES_SMALL: ReadonlyArray<{ d: string; fill: LogoFill; stroke?: boolean }> = [
+  { d: 'M14 5.4a2 2 0 0 1 4 0v.8h-4z', fill: 'butter' },
+  { d: 'M8.4 10.8c0-3.1 3.4-4.9 7.6-4.9s7.6 1.8 7.6 4.9v.2a.8.8 0 0 1-.8.8H9.2a.8.8 0 0 1-.8-.8z', fill: 'milk' },
+  {
+    d: 'M12 12.8h8v1.6l3.9 2.4c.6.4.9 1 .9 1.7v7.4a2.5 2.5 0 0 1-2.5 2.5H9.7a2.5 2.5 0 0 1-2.5-2.5v-7.4c0-.7.3-1.3.9-1.7L12 14.4z',
+    fill: 'milk',
+  },
+  { d: 'M7.2 20.6c2.9-1.8 5.9-1.8 8.8 0s5.9 1.8 8.8 0v3.4c-2.9 1.8-5.9 1.8-8.8 0s-5.9-1.8-8.8 0z', fill: 'blue' },
+];
