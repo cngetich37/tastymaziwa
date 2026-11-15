@@ -743,6 +743,22 @@ export function setSalePrice(db: DB, actor: Actor, pricePerLitreCents: number) {
   });
 }
 
+/** The owner's WhatsApp number for stock updates (E.164), or null to turn them off. */
+export function setStockAlertPhone(db: DB, actor: Actor, phone: string | null) {
+  return db.transaction(async (tx) => {
+    if (!isManager(actor)) throw new DomainError('Only the owner can change notifications');
+    const [previous] = await tx
+      .select({ phone: shops.stockAlertWhatsapp })
+      .from(shops)
+      .where(eq(shops.id, actor.shopId));
+    await tx.update(shops).set({ stockAlertWhatsapp: phone }).where(eq(shops.id, actor.shopId));
+    await audit(tx, actor, 'shop.stock_alert_whatsapp', 'shop', actor.shopId, {
+      from: previous?.phone ?? null,
+      to: phone,
+    });
+  });
+}
+
 // --- products -------------------------------------------------------------------
 
 export function createProduct(db: DB, actor: Actor, input: ProductInput) {

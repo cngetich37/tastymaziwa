@@ -68,6 +68,8 @@ export const shops = pgTable('shops', {
   name: text('name').notNull(),
   /** The owner's selling price per litre. Attendants' sales always use it. */
   salePricePerLitreCents: cents('sale_price_per_litre_cents'),
+  /** E.164 WhatsApp number the owner gets stock updates on. Null = off. */
+  stockAlertWhatsapp: text('stock_alert_whatsapp'),
   createdAt: createdAt(),
 });
 

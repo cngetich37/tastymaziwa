@@ -81,6 +81,8 @@ src/
     mpesa/            daraja.ts (Daraja client, fetch injectable), crypto.ts (credential
                       encryption, callback secrets), payments.ts (prompts, callback, status),
                       c2b.ts (till reconciliation: confirmations, matching, inbox)
+    notify/           whatsapp.ts (Cloud API template sender; dev outbox), stock-alerts.ts
+                      (owner's stock updates; run from actions with after(), never in the transaction)
     users.ts, password.ts
   lib/                isomorphic and pure: safe on the client
     money.ts          cents/millilitre parsing, line totals, formatting

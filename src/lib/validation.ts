@@ -397,6 +397,11 @@ export const salePriceSchema = z.object({
   pricePerLitre: kesField('Selling price'),
 });
 
+/** Blank = no WhatsApp stock updates. */
+export const stockAlertSchema = z.object({
+  phone: phoneField,
+});
+
 export const subscriptionSchema = z.object({
   customerId: id,
   dailyLitres: litresField('Daily litres'),

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { InviteStaffButton } from '@/components/dialog-buttons';
-import { SalePriceForm } from '@/components/forms/entry-forms';
+import { SalePriceForm, StockAlertForm } from '@/components/forms/entry-forms';
 import { PageHeader } from '@/components/page-header';
 import { ShopNameForm, TeamMemberMenu } from '@/components/forms/account-forms';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,19 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <SalePriceForm priceCents={shop?.salePricePerLitreCents ?? null} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>WhatsApp stock updates</CardTitle>
+            <CardDescription>
+              Get a WhatsApp message when milk or stock is received, written off or cancelled, and when a sale
+              leaves something running low.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <StockAlertForm phone={shop?.stockAlertWhatsapp ?? null} />
           </CardContent>
         </Card>
 

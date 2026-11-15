@@ -33,6 +33,7 @@ import {
   recordSupplierPaymentAction,
   reviewDeliveryAction,
   setSalePriceAction,
+  setStockAlertPhoneAction,
   submitDeliveryAction,
   updateCustomerAction,
   updateProductAction,
@@ -64,6 +65,7 @@ import {
   shiftCloseSchema,
   saleSchema,
   spoilageSchema,
+  stockAlertSchema,
   submitDeliverySchema,
   subscriptionSchema,
   supplierPaymentSchema,
@@ -1378,6 +1380,30 @@ export function SalePriceForm({ priceCents }: { priceCents: number | null }) {
           description="Every sale uses this price. Past sales keep the price they were sold at."
         />
         <SubmitButton pending={pending}>Save price</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+/** The owner's WhatsApp number for stock updates. Blank turns them off. */
+export function StockAlertForm({ phone }: { phone: string | null }) {
+  const { form, onSubmit, pending } = useActionForm(
+    stockAlertSchema,
+    setStockAlertPhoneAction,
+    { phone: phone ?? '' },
+    { success: 'WhatsApp updates saved', keepValues: true },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+        <TextField
+          name="phone"
+          label="WhatsApp number"
+          kind="tel"
+          placeholder="0712 345 678"
+          description="Leave blank to turn updates off."
+        />
+        <SubmitButton pending={pending}>Save number</SubmitButton>
       </form>
     </Form>
   );

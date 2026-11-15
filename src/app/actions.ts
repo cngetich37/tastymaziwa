@@ -4,7 +4,11 @@
  * role-checked and validated by `defineAction`. External callers (cron,
  * payment callbacks) use route handlers under src/app/api instead.
  */
+import { after } from 'next/server';
 import { sessionVersionProof, updateSession } from '@/auth';
+import type { DB } from '@/db';
+import type { Actor } from '@/server/ledger';
+import { notifyStockChange } from '@/server/notify/stock-alerts';
 import { ALL_ROLES, OWNER, STAFF, SUPPLIER, defineAction } from '@/server/action';
 import * as accounts from '@/server/auth/accounts';
 import * as ledger from '@/server/ledger';
@@ -55,6 +59,7 @@ import {
   saleSchema,
   salePriceSchema,
   spoilageSchema,
+  stockAlertSchema,
   updateCustomerSchema,
   updateSupplierSchema,
   subscriptionSchema,
@@ -65,23 +70,45 @@ import {
 
 const idOnly = <T extends { id: string }>(row: T) => ({ id: row.id });
 
+/**
+ * WhatsApp the owner about a stock movement once the response has been sent,
+ * so the counter never waits on it. A failed message never fails the entry.
+ */
+function alertStock(db: DB, actor: Actor, entryId: string | null | undefined) {
+  if (!entryId) return;
+  after(async () => {
+    try {
+      await notifyStockChange(db, actor.shopId, entryId);
+    } catch (error) {
+      console.error('[whatsapp] stock update failed', error);
+    }
+  });
+}
+
 // --- counter entries (owner and seller) ----------------------------------
 // Attendants record quantities only: prices and dates are enforced in the
 // ledger services (see resolvePrice / entryDateFor), not just hidden in the UI.
 
-export const recordSaleAction = defineAction({ schema: saleSchema, roles: STAFF }, ({ db, actor }, input) =>
-  ledger.recordSale(db, actor, input).then(idOnly),
-);
+export const recordSaleAction = defineAction({ schema: saleSchema, roles: STAFF }, async ({ db, actor }, input) => {
+  const entry = await ledger.recordSale(db, actor, input);
+  alertStock(db, actor, entry.id);
+  return idOnly(entry);
+});
 
-export const recordDeliveryAction = defineAction(
-  { schema: deliverySchema, roles: STAFF },
-  ({ db, actor }, input) => ledger.recordDelivery(db, actor, input).then(idOnly),
-);
+export const recordDeliveryAction = defineAction({ schema: deliverySchema, roles: STAFF }, async ({ db, actor }, input) => {
+  const entry = await ledger.recordDelivery(db, actor, input);
+  alertStock(db, actor, entry.id);
+  return idOnly(entry);
+});
 
 /** The seller (or owner) approves or rejects a delivery a supplier recorded. */
 export const reviewDeliveryAction = defineAction(
   { schema: reviewDeliverySchema, roles: STAFF },
-  ({ db, actor }, input) => ledger.reviewDelivery(db, actor, input).then((s) => ({ id: s.id, status: s.status })),
+  async ({ db, actor }, input) => {
+    const s = await ledger.reviewDelivery(db, actor, input);
+    alertStock(db, actor, s.ledgerEntryId);
+    return { id: s.id, status: s.status };
+  },
 );
 
 // --- suppliers' own logins ------------------------------------------------------
@@ -100,7 +127,11 @@ export const recordCustomerPaymentAction = defineAction(
 
 export const recordSpoilageAction = defineAction(
   { schema: spoilageSchema, roles: OWNER },
-  ({ db, actor }, input) => ledger.recordSpoilage(db, actor, input).then(idOnly),
+  async ({ db, actor }, input) => {
+    const entry = await ledger.recordSpoilage(db, actor, input);
+    alertStock(db, actor, entry.id);
+    return idOnly(entry);
+  },
 );
 
 export const createCustomerAction = defineAction(
@@ -125,7 +156,11 @@ export const recordExpenseAction = defineAction(
 
 export const reverseEntryAction = defineAction(
   { schema: reverseEntrySchema, roles: OWNER },
-  ({ db, actor }, input) => ledger.reverseEntry(db, actor, input.entryId, input.reason).then(idOnly),
+  async ({ db, actor }, input) => {
+    const entry = await ledger.reverseEntry(db, actor, input.entryId, input.reason);
+    alertStock(db, actor, entry.id);
+    return idOnly(entry);
+  },
 );
 
 export const updateCustomerAction = defineAction(
@@ -140,6 +175,10 @@ export const updateSupplierAction = defineAction(
 
 export const setSalePriceAction = defineAction({ schema: salePriceSchema, roles: OWNER }, ({ db, actor }, input) =>
   ledger.setSalePrice(db, actor, input.pricePerLitre),
+);
+
+export const setStockAlertPhoneAction = defineAction({ schema: stockAlertSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.setStockAlertPhone(db, actor, input.phone ?? null),
 );
 
 export const createSupplierAction = defineAction(

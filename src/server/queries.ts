@@ -28,6 +28,7 @@ import {
 } from '@/db/schema';
 import { allocatePayments, type AllocatedCreditSale } from '@/lib/calc/allocation';
 import { statementForPeriod, withRunningBalance } from '@/lib/calc/statement';
+import { isLowStock } from '@/lib/calc/stock-alert';
 import {
   customerBalanceCents,
   dailySeries,
@@ -633,7 +634,7 @@ export async function getStockLevels(
       onHand: milk.onHand,
       sold7d: milk.sold7d,
       archived: false,
-      low: milk.onHand < 0,
+      low: isLowStock(milk.onHand, null),
     },
   ];
   for (const p of rows) {
@@ -648,10 +649,24 @@ export async function getStockLevels(
       onHand: m.onHand,
       sold7d: m.sold7d,
       archived: p.archivedAt != null,
-      low: p.archivedAt == null && (m.onHand < 0 || (p.reorderLevel != null && m.onHand <= p.reorderLevel)),
+      low: p.archivedAt == null && isLowStock(m.onHand, p.reorderLevel),
     });
   }
   return levels;
+}
+
+/** Stock on hand of one item (null = fresh milk), in thousandths of its unit. */
+export async function getItemOnHand(db: DB, shopId: string, productId: string | null): Promise<number> {
+  const [row] = await db
+    .select({ onHand: stockMovement })
+    .from(ledgerEntries)
+    .where(
+      and(
+        eq(ledgerEntries.shopId, shopId),
+        productId ? eq(ledgerEntries.productId, productId) : isNull(ledgerEntries.productId),
+      ),
+    );
+  return row?.onHand ?? 0;
 }
 
 export async function getProduct(db: DB, shopId: string, productId: string) {
