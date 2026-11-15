@@ -20,6 +20,12 @@ import {
   inviteSupplierSchema,
   archiveProductSchema,
   reviewShiftCloseSchema,
+  advanceSchema,
+  attendanceSchema,
+  employeeActiveSchema,
+  employeeSchema,
+  postPayrollSchema,
+  updateEmployeeSchema,
   budgetsSchema,
   paySuppliersSchema,
   shiftCloseSchema,
@@ -148,6 +154,34 @@ export const paySuppliersAction = defineAction({ schema: paySuppliersSchema, rol
 
 export const setBudgetsAction = defineAction({ schema: budgetsSchema, roles: OWNER }, ({ db, actor }, input) =>
   ledger.setBudgets(db, actor, input).then(() => null),
+);
+
+// --- staff & payroll (owner) --------------------------------------------------------
+
+export const createEmployeeAction = defineAction({ schema: employeeSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.createEmployee(db, actor, input).then(idOnly),
+);
+
+export const updateEmployeeAction = defineAction(
+  { schema: updateEmployeeSchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.updateEmployee(db, actor, input).then(idOnly),
+);
+
+export const setEmployeeActiveAction = defineAction(
+  { schema: employeeActiveSchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.setEmployeeActive(db, actor, input.employeeId, input.active).then(() => null),
+);
+
+export const setAttendanceAction = defineAction({ schema: attendanceSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.setAttendance(db, actor, input).then(() => null),
+);
+
+export const giveAdvanceAction = defineAction({ schema: advanceSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.giveAdvance(db, actor, input).then(idOnly),
+);
+
+export const postPayrollAction = defineAction({ schema: postPayrollSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.postPayroll(db, actor, input).then((r) => ({ id: r.id, netCents: r.netCents })),
 );
 
 // --- shift close -------------------------------------------------------------------

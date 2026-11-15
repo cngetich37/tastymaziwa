@@ -71,3 +71,33 @@ test('owner settles suppliers in one run, reads a statement and sets a budget', 
   await page.getByRole('button', { name: 'Save budgets' }).click();
   await expect(page.getByText('Budgets saved').first()).toBeVisible();
 });
+
+test('owner adds a day worker, marks them in, gives an advance and pays the month', async ({ page }) => {
+  await signInWithPassword(page, E2E_OWNER.email, E2E_OWNER.password);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Staff member' }).click();
+  await formReady(page, 'Add staff member');
+  await page.getByLabel('Name').fill('Otieno');
+  await page.getByLabel('Pay per day worked').fill('500');
+  await page.getByRole('button', { name: 'Add staff member' }).click();
+  await expect(page.getByText('Added to the team').first()).toBeVisible();
+
+  const toggle = page.getByRole('switch', { name: 'Otieno present today' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+  await page.getByRole('button', { name: 'Give Otieno an advance' }).first().click();
+  await formReady(page, 'Give advance');
+  await page.getByLabel('Amount').fill('200');
+  await page.getByRole('button', { name: 'Give advance' }).click();
+  await expect(page.getByText('Advance to Otieno recorded').first()).toBeVisible();
+
+  await page.getByRole('link', { name: 'Payroll' }).first().click();
+  await expect(page).toHaveURL(/\/payroll/);
+  await expect(page.getByRole('list', { name: 'Payroll' })).toContainText('Otieno');
+  await page.getByRole('button', { name: 'Pay Ksh 300' }).click();
+  await formReady(page, 'Pay Ksh 300');
+  await page.getByRole('dialog').getByRole('button', { name: 'Pay Ksh 300' }).click();
+  await expect(page.getByText('Payroll paid: Ksh 300').first()).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Paid Ksh 300' }).first()).toBeVisible();
+});

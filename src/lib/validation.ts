@@ -155,6 +155,40 @@ export const budgetsSchema = z.object({
   budgets: z.array(z.object({ category: z.enum(EXPENSE_CATEGORIES), monthly: optionalField(kesFieldAllowZero('Budget')) })),
 });
 
+// --- staff & payroll --------------------------------------------------------------
+
+export const PAY_TYPES = ['daily', 'monthly'] as const;
+
+export const employeeSchema = z.object({
+  name: z.string().trim().min(2, 'Enter a name').max(120),
+  phone: phoneField,
+  payType: z.enum(PAY_TYPES),
+  rate: kesFieldAllowZero('Pay rate'),
+  /** Defaults to today. */
+  startDate: optionalField(isoDate),
+});
+
+export const updateEmployeeSchema = employeeSchema.extend({ employeeId: id });
+export const employeeActiveSchema = z.object({ employeeId: id, active: z.boolean() });
+
+export const attendanceSchema = z.object({
+  employeeId: id,
+  date: entryDate,
+  present: z.boolean(),
+});
+
+export const advanceSchema = z.object({
+  employeeId: id,
+  amount: kesField(),
+  paymentMethod: z.enum(IMMEDIATE_PAYMENT_METHODS),
+  note: optionalText(),
+});
+
+export const postPayrollSchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Choose a month'),
+  paymentMethod: z.enum(IMMEDIATE_PAYMENT_METHODS),
+});
+
 // --- shift close ------------------------------------------------------------------
 
 const countField = (label: string) => scaledField(kesToCents, label, { allowZero: true });
@@ -418,6 +452,11 @@ export type InviteStaffInput = z.output<typeof inviteStaffSchema>;
 export type InviteSupplierInput = z.output<typeof inviteSupplierSchema>;
 export type PaySuppliersInput = z.output<typeof paySuppliersSchema>;
 export type BudgetsInput = z.output<typeof budgetsSchema>;
+export type EmployeeInput = z.output<typeof employeeSchema>;
+export type UpdateEmployeeInput = z.output<typeof updateEmployeeSchema>;
+export type AttendanceInput = z.output<typeof attendanceSchema>;
+export type AdvanceInput = z.output<typeof advanceSchema>;
+export type PostPayrollInput = z.output<typeof postPayrollSchema>;
 export type ShiftCloseInput = z.output<typeof shiftCloseSchema>;
 export type ReviewShiftCloseInput = z.output<typeof reviewShiftCloseSchema>;
 export type ProductInput = z.output<typeof productSchema>;

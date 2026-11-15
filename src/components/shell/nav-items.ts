@@ -3,10 +3,13 @@ import {
   Boxes,
   ChartColumn,
   ClipboardCheck,
+  Contact,
+  HandCoins,
   LayoutDashboard,
   Milk,
   Receipt,
   Settings,
+  ShieldCheck,
   ShoppingCart,
   Truck,
   Users,
@@ -46,6 +49,8 @@ export const PAY_SUPPLIERS: NavItem = { href: '/suppliers/pay', label: 'Pay supp
 export const EXPENSES: NavItem = { href: '/expenses', label: 'Expenses', icon: Receipt };
 export const INVENTORY: NavItem = { href: '/inventory', label: 'Stock & products', icon: Boxes };
 export const LEDGER: NavItem = { href: '/ledger', label: 'Ledger', icon: BookOpen };
+export const STAFF_PAGE: NavItem = { href: '/staff', label: 'Staff', icon: Contact };
+export const PAYROLL: NavItem = { href: '/payroll', label: 'Payroll', icon: HandCoins };
 export const REPORTS: NavItem = { href: '/reports', label: 'Reports', icon: ChartColumn };
 export const SETTINGS: NavItem = { href: '/settings', label: 'Settings', icon: Settings };
 
@@ -59,7 +64,9 @@ const MODULES: NavGroup[] = [
   { id: 'purchasing', label: 'Purchasing', icon: Truck, items: [DELIVERIES, SUPPLIERS, PAY_SUPPLIERS] },
   { id: 'inventory', label: 'Inventory', icon: Boxes, items: [INVENTORY] },
   { id: 'finance', label: 'Finance', icon: BookOpen, items: [EXPENSES, LEDGER] },
-  { id: 'insights', label: 'Insights', icon: ChartColumn, items: [REPORTS, SETTINGS] },
+  { id: 'people', label: 'People', icon: Contact, items: [STAFF_PAGE, PAYROLL] },
+  { id: 'insights', label: 'Insights', icon: ChartColumn, items: [REPORTS] },
+  { id: 'admin', label: 'Admin', icon: ShieldCheck, items: [SETTINGS] },
 ];
 
 const canSee = (item: NavItem, role: Role) => (item.roles ?? ['owner']).includes(role);

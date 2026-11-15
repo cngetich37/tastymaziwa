@@ -9,7 +9,12 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'dr
 import { alias } from 'drizzle-orm/pg-core';
 import type { DB } from '@/db/client';
 import {
+  attendance,
   customers,
+  employeeAdvances,
+  employees,
+  payrollLines,
+  payrollRuns,
   deliverySubmissions,
   expenseBudgets,
   ledgerEntries,
@@ -734,6 +739,78 @@ export async function getExpenseBreakdown(db: DB, shopId: string, from: Business
     spent: new Map(spent.map((s) => [s.category ?? 'other', s.amountCents])),
     budgets: new Map(budgets.map((b) => [b.category, b.monthlyCents])),
   };
+}
+
+// --- staff & payroll ------------------------------------------------------------------
+
+/** The team with this month's days worked, today's attendance and advances still owed. */
+export async function listEmployees(db: DB, shopId: string, today = todayBusinessDate()) {
+  const from = `${today.slice(0, 7)}-01`;
+  const [staff, days, advances] = await Promise.all([
+    db.select().from(employees).where(eq(employees.shopId, shopId)).orderBy(desc(employees.active), employees.name),
+    db
+      .select({
+        employeeId: attendance.employeeId,
+        days: sql<number>`count(*)`.mapWith(Number),
+        today: sql<boolean>`bool_or(${attendance.businessDate} = ${today})`,
+      })
+      .from(attendance)
+      .where(and(eq(attendance.shopId, shopId), gte(attendance.businessDate, from), lte(attendance.businessDate, today)))
+      .groupBy(attendance.employeeId),
+    db
+      .select({
+        employeeId: employeeAdvances.employeeId,
+        cents: sql<number>`coalesce(sum(${employeeAdvances.amountCents}), 0)`.mapWith(Number),
+      })
+      .from(employeeAdvances)
+      .where(and(eq(employeeAdvances.shopId, shopId), isNull(employeeAdvances.settledInRunId)))
+      .groupBy(employeeAdvances.employeeId),
+  ]);
+  const daysOf = new Map(days.map((d) => [d.employeeId, d]));
+  const advOf = new Map(advances.map((a) => [a.employeeId, a.cents]));
+  return staff.map((e) => ({
+    ...e,
+    daysThisMonth: daysOf.get(e.id)?.days ?? 0,
+    presentToday: daysOf.get(e.id)?.today ?? false,
+    advancesCents: advOf.get(e.id) ?? 0,
+  }));
+}
+
+export type EmployeeItem = Awaited<ReturnType<typeof listEmployees>>[number];
+
+export async function listPayrollRuns(db: DB, shopId: string) {
+  const [runs, lines] = await Promise.all([
+    db
+      .select({
+        id: payrollRuns.id,
+        month: payrollRuns.month,
+        paymentMethod: payrollRuns.paymentMethod,
+        grossCents: payrollRuns.grossCents,
+        advancesCents: payrollRuns.advancesCents,
+        netCents: payrollRuns.netCents,
+        postedAt: payrollRuns.postedAt,
+        postedByName: users.name,
+      })
+      .from(payrollRuns)
+      .leftJoin(users, eq(users.id, payrollRuns.postedBy))
+      .where(eq(payrollRuns.shopId, shopId))
+      .orderBy(desc(payrollRuns.month))
+      .limit(24),
+    db
+      .select({
+        runId: payrollLines.runId,
+        name: employees.name,
+        daysWorked: payrollLines.daysWorked,
+        grossCents: payrollLines.grossCents,
+        advancesCents: payrollLines.advancesCents,
+        netCents: payrollLines.netCents,
+      })
+      .from(payrollLines)
+      .innerJoin(employees, eq(employees.id, payrollLines.employeeId))
+      .where(eq(payrollLines.shopId, shopId))
+      .orderBy(employees.name),
+  ]);
+  return runs.map((r) => ({ ...r, lines: lines.filter((l) => l.runId === r.id) }));
 }
 
 // --- shop ---------------------------------------------------------------------

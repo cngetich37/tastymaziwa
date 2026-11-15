@@ -95,6 +95,13 @@ Mark each item done with `[x]` as it ships.
 - [x] **P&L report** for any date range: revenue, cost of milk, expenses, gross and net profit, per day, with CSV and print/PDF export. (Spoilage is shown in litres; costing it is still to do.)
 - [x] **Margin per litre** for any period (Reports → Profit & loss). A chart over time is still to do.
 
+### Staff and payroll
+- [x] **Staff records** (`/staff`) with day-rate or monthly pay, independent of app logins.
+- [x] **Attendance**: one tap per person per day.
+- [x] **Advances**: paid out at once as a `wages` expense (so the shift close counts it), deducted at payroll.
+- [x] **Monthly payroll** (`/payroll`): days × rate or prorated salary, less advances (excess carried forward); net pay posted as wages; once per month.
+- [ ] Payslips (printable / WhatsApp) and NSSF/SHIF/PAYE deductions if staff are formally employed.
+
 ## P2: Standout features
 
 - [ ] **Offline-first PWA.** The app installs to the home screen. Sales are recorded offline into IndexedDB (Dexie) and sync when the connection returns, with a visible "3 unsynced" badge. Serwist handles the service worker.

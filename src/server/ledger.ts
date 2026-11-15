@@ -3,10 +3,15 @@
  * function runs in one DB transaction and writes an audit row alongside the
  * change. Callers (server actions, cron routes, scripts) handle auth.
  */
-import { and, desc, eq, gt, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNull, lte, sql } from 'drizzle-orm';
 import type { DB, Tx } from '@/db/client';
 import {
+  attendance,
   auditLog,
+  employeeAdvances,
+  employees,
+  payrollLines,
+  payrollRuns,
   customers,
   deliverySubmissions,
   expenseBudgets,
@@ -19,15 +24,22 @@ import {
   users,
   type LedgerEntry,
   type NewLedgerEntry,
+  type PayType,
   type Role,
 } from '@/db/schema';
 import { addDays, todayBusinessDate, type BusinessDate } from '@/lib/dates';
 import { expectedTakings } from '@/lib/calc/close';
 import { overCreditLimit } from '@/lib/calc/finance';
+import { computePay, type PayLine } from '@/lib/calc/payroll';
 import { formatKES, lineTotalCents } from '@/lib/money';
 import type {
   CustomerInput,
+  AdvanceInput,
+  AttendanceInput,
   BudgetsInput,
+  EmployeeInput,
+  PostPayrollInput,
+  UpdateEmployeeInput,
   CustomerPaymentInput,
   PaySuppliersInput,
   ProductInput,
@@ -934,5 +946,280 @@ export function setBudgets(db: DB, actor: Actor, input: BudgetsInput) {
       }
     }
     await audit(tx, actor, 'budgets.set', 'shop', actor.shopId, input.budgets);
+  });
+}
+
+// --- staff & payroll ----------------------------------------------------------------
+
+async function assertEmployee(tx: Tx, actor: Actor, employeeId: string) {
+  const [row] = await tx
+    .select()
+    .from(employees)
+    .where(and(eq(employees.id, employeeId), eq(employees.shopId, actor.shopId)));
+  if (!row) throw new DomainError('Staff member not found');
+  return row;
+}
+
+function ownerOnly(actor: Actor, what: string) {
+  if (!isManager(actor)) throw new DomainError(`Only the owner ${what}`);
+}
+
+export function createEmployee(db: DB, actor: Actor, input: EmployeeInput) {
+  return db.transaction(async (tx) => {
+    ownerOnly(actor, 'manages staff');
+    const [employee] = await tx
+      .insert(employees)
+      .values({
+        shopId: actor.shopId,
+        name: input.name,
+        phone: input.phone ?? null,
+        payType: input.payType,
+        rateCents: input.rate,
+        startDate: input.startDate ?? todayBusinessDate(),
+      })
+      .returning();
+    await audit(tx, actor, 'employee.create', 'employee', employee.id, input);
+    return employee;
+  });
+}
+
+export function updateEmployee(db: DB, actor: Actor, input: UpdateEmployeeInput) {
+  return db.transaction(async (tx) => {
+    ownerOnly(actor, 'manages staff');
+    const before = await assertEmployee(tx, actor, input.employeeId);
+    const [employee] = await tx
+      .update(employees)
+      .set({
+        name: input.name,
+        phone: input.phone ?? null,
+        payType: input.payType,
+        rateCents: input.rate,
+        startDate: input.startDate ?? before.startDate,
+      })
+      .where(and(eq(employees.id, input.employeeId), eq(employees.shopId, actor.shopId)))
+      .returning();
+    await audit(tx, actor, 'employee.update', 'employee', employee.id, { ...input, previousRateCents: before.rateCents });
+    return employee;
+  });
+}
+
+export function setEmployeeActive(db: DB, actor: Actor, employeeId: string, active: boolean) {
+  return db.transaction(async (tx) => {
+    ownerOnly(actor, 'manages staff');
+    await assertEmployee(tx, actor, employeeId);
+    await tx
+      .update(employees)
+      .set({ active })
+      .where(and(eq(employees.id, employeeId), eq(employees.shopId, actor.shopId)));
+    await audit(tx, actor, active ? 'employee.activate' : 'employee.deactivate', 'employee', employeeId);
+  });
+}
+
+/** Mark someone present (or not) on a day. Idempotent either way. */
+export function setAttendance(db: DB, actor: Actor, input: AttendanceInput) {
+  return db.transaction(async (tx) => {
+    ownerOnly(actor, 'marks attendance');
+    const employee = await assertEmployee(tx, actor, input.employeeId);
+    const businessDate = entryDateFor(actor, input.date);
+    if (input.present) {
+      if (!employee.active) throw new DomainError(`${employee.name} is no longer on the team`);
+      await tx
+        .insert(attendance)
+        .values({ shopId: actor.shopId, employeeId: employee.id, businessDate, markedBy: actor.id })
+        .onConflictDoNothing({ target: [attendance.employeeId, attendance.businessDate] });
+    } else {
+      await tx
+        .delete(attendance)
+        .where(
+          and(
+            eq(attendance.shopId, actor.shopId),
+            eq(attendance.employeeId, employee.id),
+            eq(attendance.businessDate, businessDate),
+          ),
+        );
+    }
+    await audit(tx, actor, input.present ? 'attendance.present' : 'attendance.absent', 'employee', employee.id, {
+      businessDate,
+    });
+  });
+}
+
+/** Money paid to a staff member before payday: a wages expense now, deducted at payroll. */
+export function giveAdvance(db: DB, actor: Actor, input: AdvanceInput) {
+  return db.transaction(async (tx) => {
+    ownerOnly(actor, 'gives advances');
+    const employee = await assertEmployee(tx, actor, input.employeeId);
+    const businessDate = entryDateFor(actor, undefined);
+    const entry = await insertEntry(tx, actor, {
+      kind: 'expense',
+      businessDate,
+      amountCents: input.amount,
+      paymentMethod: input.paymentMethod,
+      expenseCategory: 'wages',
+      note: `Advance: ${employee.name}${input.note ? ` (${input.note})` : ''}`,
+    });
+    const [advance] = await tx
+      .insert(employeeAdvances)
+      .values({
+        shopId: actor.shopId,
+        employeeId: employee.id,
+        businessDate,
+        amountCents: input.amount,
+        note: input.note ?? null,
+        ledgerEntryId: entry.id,
+        createdBy: actor.id,
+      })
+      .returning();
+    await audit(tx, actor, 'employee.advance', 'employee', employee.id, { amountCents: input.amount, advanceId: advance.id });
+    return advance;
+  });
+}
+
+export interface PayrollPreviewLine extends PayLine {
+  employeeId: string;
+  name: string;
+  payType: PayType;
+  rateCents: number;
+}
+
+/**
+ * What each person is owed for a month: active staff, plus anyone who worked
+ * or took an advance that month. Shared by the preview and by posting.
+ */
+export async function payrollPreview(q: DB | Tx, shopId: string, month: string): Promise<PayrollPreviewLine[]> {
+  const from = `${month}-01`;
+  const lastDay = monthLastDay(month);
+  const [staff, days, advances] = await Promise.all([
+    q.select().from(employees).where(eq(employees.shopId, shopId)).orderBy(employees.name),
+    q
+      .select({ employeeId: attendance.employeeId, days: sql<number>`count(*)`.mapWith(Number) })
+      .from(attendance)
+      .where(and(eq(attendance.shopId, shopId), gte(attendance.businessDate, from), lte(attendance.businessDate, lastDay)))
+      .groupBy(attendance.employeeId),
+    q
+      .select({ employeeId: employeeAdvances.employeeId, cents: sql<number>`coalesce(sum(${employeeAdvances.amountCents}), 0)`.mapWith(Number) })
+      .from(employeeAdvances)
+      .where(
+        and(
+          eq(employeeAdvances.shopId, shopId),
+          isNull(employeeAdvances.settledInRunId),
+          lte(employeeAdvances.businessDate, lastDay),
+        ),
+      )
+      .groupBy(employeeAdvances.employeeId),
+  ]);
+  const daysOf = new Map(days.map((d) => [d.employeeId, d.days]));
+  const advancesOf = new Map(advances.map((a) => [a.employeeId, a.cents]));
+  return staff
+    .filter((e) => (e.active && e.startDate <= lastDay) || daysOf.has(e.id) || advancesOf.has(e.id))
+    .map((e) => ({
+      employeeId: e.id,
+      name: e.name,
+      payType: e.payType,
+      rateCents: e.rateCents,
+      ...computePay(
+        {
+          payType: e.payType,
+          // Someone who has left gets day pay for days marked, but no salary.
+          rateCents: e.active || e.payType === 'daily' ? e.rateCents : 0,
+          startDate: e.startDate,
+          daysWorked: daysOf.get(e.id) ?? 0,
+          advancesCents: advancesOf.get(e.id) ?? 0,
+        },
+        { from, lastDay },
+      ),
+    }));
+}
+
+const monthLastDay = (month: string) => {
+  const [y, m] = month.split('-').map(Number);
+  return addDays(m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`, -1);
+};
+
+/**
+ * Pay a month's wages: one run per month, each line's net pay posted as a
+ * `wages` expense, advances marked settled (any excess carried forward).
+ */
+export function postPayroll(db: DB, actor: Actor, input: PostPayrollInput) {
+  return db.transaction(async (tx) => {
+    ownerOnly(actor, 'runs payroll');
+    if (input.month > todayBusinessDate().slice(0, 7)) throw new DomainError("You can't pay a month that hasn't started");
+    const [existing] = await tx
+      .select({ id: payrollRuns.id })
+      .from(payrollRuns)
+      .where(and(eq(payrollRuns.shopId, actor.shopId), eq(payrollRuns.month, input.month)));
+    if (existing) throw new DomainError('Payroll for this month has already been paid');
+    const lines = (await payrollPreview(tx, actor.shopId, input.month)).filter(
+      (l) => l.grossCents > 0 || l.advancesCents > 0 || l.carryForwardCents > 0,
+    );
+    if (lines.length === 0) throw new DomainError('Nobody is due any pay for this month');
+
+    const sum = (k: 'grossCents' | 'advancesCents' | 'netCents') => lines.reduce((n, l) => n + l[k], 0);
+    const [run] = await tx
+      .insert(payrollRuns)
+      .values({
+        shopId: actor.shopId,
+        month: input.month,
+        paymentMethod: input.paymentMethod,
+        grossCents: sum('grossCents'),
+        advancesCents: sum('advancesCents'),
+        netCents: sum('netCents'),
+        postedBy: actor.id,
+      })
+      .returning();
+
+    const lastDay = monthLastDay(input.month);
+    const payDate = lastDay < todayBusinessDate() ? lastDay : todayBusinessDate();
+    for (const line of lines) {
+      const entry =
+        line.netCents > 0
+          ? await insertEntry(tx, actor, {
+              kind: 'expense',
+              businessDate: payDate,
+              amountCents: line.netCents,
+              paymentMethod: input.paymentMethod,
+              expenseCategory: 'wages',
+              note: `Wages ${input.month}: ${line.name}`,
+              idempotencyKey: `payroll:${run.id}:${line.employeeId}`,
+            })
+          : null;
+      await tx.insert(payrollLines).values({
+        shopId: actor.shopId,
+        runId: run.id,
+        employeeId: line.employeeId,
+        daysWorked: line.daysWorked,
+        grossCents: line.grossCents,
+        advancesCents: line.advancesCents,
+        netCents: line.netCents,
+        ledgerEntryId: entry?.id ?? null,
+      });
+      await tx
+        .update(employeeAdvances)
+        .set({ settledInRunId: run.id })
+        .where(
+          and(
+            eq(employeeAdvances.shopId, actor.shopId),
+            eq(employeeAdvances.employeeId, line.employeeId),
+            isNull(employeeAdvances.settledInRunId),
+            lte(employeeAdvances.businessDate, lastDay),
+          ),
+        );
+      if (line.carryForwardCents > 0) {
+        await tx.insert(employeeAdvances).values({
+          shopId: actor.shopId,
+          employeeId: line.employeeId,
+          businessDate: addDays(lastDay, 1),
+          amountCents: line.carryForwardCents,
+          note: `Carried forward from ${input.month}`,
+          createdBy: actor.id,
+        });
+      }
+    }
+    await audit(tx, actor, 'payroll.post', 'payroll_run', run.id, {
+      month: input.month,
+      lines: lines.length,
+      netCents: run.netCents,
+    });
+    return run;
   });
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Banknote, CalendarClock, Lock, NotebookPen, Smartphone } from 'lucide-react';
+import { useFormContext } from 'react-hook-form';
 import { Form } from '@/components/ui/form';
 import {
   createCustomerAction,
@@ -9,6 +10,10 @@ import {
   createSubscriptionAction,
   createSupplierAction,
   inviteStaffAction,
+  createEmployeeAction,
+  giveAdvanceAction,
+  postPayrollAction,
+  updateEmployeeAction,
   paySuppliersAction,
   setBudgetsAction,
   submitShiftCloseAction,
@@ -41,6 +46,10 @@ import {
   productSchema,
   reviewDeliverySchema,
   salePriceSchema,
+  advanceSchema,
+  employeeSchema,
+  postPayrollSchema,
+  updateEmployeeSchema,
   budgetsSchema,
   paySuppliersSchema,
   shiftCloseSchema,
@@ -517,6 +526,119 @@ export function BudgetsForm({ budgets, onDone }: FormProps & { budgets: Record<s
           <TextField key={c} name={`budgets.${i}.monthly`} label={titleCase(c)} kind="money" />
         ))}
         <SubmitButton pending={pending}>Save budgets</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+// --- staff & payroll ----------------------------------------------------------------
+
+export interface EmployeeDetails {
+  id: string;
+  name: string;
+  phone: string | null;
+  payType: 'daily' | 'monthly';
+  rateCents: number;
+  startDate: string;
+}
+
+const PAY_TYPE_OPTIONS: Option[] = [
+  { value: 'daily', label: 'Per day' },
+  { value: 'monthly', label: 'Per month' },
+];
+
+function EmployeeFields() {
+  const payType = useFormContext().watch('payType');
+  return (
+    <>
+      <TextField name="name" label="Name" />
+      <TextField name="phone" label="Phone (optional)" kind="tel" placeholder="0712 345 678" />
+      <ChoiceField name="payType" label="Paid" options={PAY_TYPE_OPTIONS} />
+      <TextField
+        name="rate"
+        label={payType === 'monthly' ? 'Salary per month' : 'Pay per day worked'}
+        kind="money"
+        description={payType === 'monthly' ? 'Prorated in the month they start.' : 'Paid for each day marked present.'}
+      />
+      <TextField name="startDate" label="Started on" kind="date" description="Defaults to today." />
+    </>
+  );
+}
+
+export function EmployeeForm({ onDone }: FormProps) {
+  const { form, onSubmit, pending } = useActionForm(
+    employeeSchema,
+    createEmployeeAction,
+    { name: '', phone: '', payType: 'daily', rate: '', startDate: '' },
+    { success: 'Added to the team', onSuccess: onDone },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <EmployeeFields />
+        <SubmitButton pending={pending}>Add staff member</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+export function EditEmployeeForm({ employee, onDone }: FormProps & { employee: EmployeeDetails }) {
+  const { form, onSubmit, pending } = useActionForm(
+    updateEmployeeSchema,
+    updateEmployeeAction,
+    {
+      employeeId: employee.id,
+      name: employee.name,
+      phone: employee.phone ?? '',
+      payType: employee.payType,
+      rate: centsToKesString(employee.rateCents),
+      startDate: employee.startDate,
+    },
+    { success: 'Saved', onSuccess: onDone, keepValues: true },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <EmployeeFields />
+        <SubmitButton pending={pending}>Save changes</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+/** Money paid out now and taken off their next pay. */
+export function AdvanceForm({ employeeId, name, onDone }: FormProps & { employeeId: string; name: string }) {
+  const { form, onSubmit, pending } = useActionForm(
+    advanceSchema,
+    giveAdvanceAction,
+    { employeeId, amount: '', paymentMethod: 'cash', note: '' },
+    { success: `Advance to ${name} recorded`, onSuccess: onDone },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <TextField name="amount" label="Amount" kind="money" autoFocus />
+        <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
+        <TextField name="note" label="Note (optional)" />
+        <SubmitButton pending={pending}>Give advance</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+export function PostPayrollForm({ month, netCents, onDone }: FormProps & { month: string; netCents: number }) {
+  const { form, onSubmit, pending } = useActionForm(
+    postPayrollSchema,
+    postPayrollAction,
+    { month, paymentMethod: 'mpesa' },
+    { success: (r) => `Payroll paid: ${formatKES(r.netCents)}`, onSuccess: onDone },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
+        <TotalLine cents={netCents} detail="Net pay after advances. Each person's pay is recorded as wages." />
+        <SubmitButton pending={pending}>Pay {formatKES(netCents)}</SubmitButton>
       </form>
     </Form>
   );

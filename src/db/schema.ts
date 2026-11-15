@@ -400,6 +400,146 @@ export const expenseBudgets = pgTable(
   ],
 );
 
+export const payTypeEnum = pgEnum('pay_type', ['daily', 'monthly']);
+
+/** People who work in the shop, with or without a login. */
+export const employees = pgTable(
+  'employees',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    name: text('name').notNull(),
+    phone: text('phone'),
+    payType: payTypeEnum('pay_type').notNull(),
+    /** Per day worked (daily) or per month (monthly). */
+    rateCents: cents('rate_cents').notNull(),
+    startDate: date('start_date').notNull(),
+    active: boolean('active').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('employees_id_shop_unique').on(t.id, t.shopId),
+    index('employees_shop_idx').on(t.shopId),
+    check('employees_rate_non_negative', sql`${t.rateCents} >= 0`),
+  ],
+);
+
+/** One row per person per day they worked. */
+export const attendance = pgTable(
+  'attendance',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    employeeId: uuid('employee_id').notNull(),
+    businessDate: date('business_date').notNull(),
+    markedBy: uuid('marked_by').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('attendance_employee_date_unique').on(t.employeeId, t.businessDate),
+    index('attendance_shop_date_idx').on(t.shopId, t.businessDate),
+    foreignKey({
+      name: 'attendance_employee_same_shop_fk',
+      columns: [t.employeeId, t.shopId],
+      foreignColumns: [employees.id, employees.shopId],
+    }),
+  ],
+);
+
+/**
+ * Payroll for one calendar month (`YYYY-MM`), posted once. Each line's net
+ * pay is a `wages` expense in the ledger.
+ */
+export const payrollRuns = pgTable(
+  'payroll_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    month: text('month').notNull(),
+    paymentMethod: paymentMethodEnum('payment_method').notNull(),
+    grossCents: cents('gross_cents').notNull(),
+    advancesCents: cents('advances_cents').notNull(),
+    netCents: cents('net_cents').notNull(),
+    postedBy: uuid('posted_by').references(() => users.id),
+    postedAt: timestamp('posted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('payroll_runs_id_shop_unique').on(t.id, t.shopId),
+    unique('payroll_runs_shop_month_unique').on(t.shopId, t.month),
+    check('payroll_runs_method', sql`${t.paymentMethod} in ('cash', 'mpesa')`),
+  ],
+);
+
+export const payrollLines = pgTable(
+  'payroll_lines',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    runId: uuid('run_id').notNull(),
+    employeeId: uuid('employee_id').notNull(),
+    daysWorked: integer('days_worked').notNull(),
+    grossCents: cents('gross_cents').notNull(),
+    advancesCents: cents('advances_cents').notNull(),
+    netCents: cents('net_cents').notNull(),
+    /** The wages expense for the net pay; null when nothing was left to pay. */
+    ledgerEntryId: uuid('ledger_entry_id'),
+  },
+  (t) => [
+    index('payroll_lines_run_idx').on(t.runId),
+    foreignKey({ name: 'payroll_lines_run_same_shop_fk', columns: [t.runId, t.shopId], foreignColumns: [payrollRuns.id, payrollRuns.shopId] }),
+    foreignKey({
+      name: 'payroll_lines_employee_same_shop_fk',
+      columns: [t.employeeId, t.shopId],
+      foreignColumns: [employees.id, employees.shopId],
+    }),
+    foreignKey({
+      name: 'payroll_lines_ledger_same_shop_fk',
+      columns: [t.ledgerEntryId, t.shopId],
+      foreignColumns: [ledgerEntries.id, ledgerEntries.shopId],
+    }),
+  ],
+);
+
+/**
+ * Money given to staff before payday. Paid out at once (a `wages` expense),
+ * then deducted from the next payroll that settles it. A carried-forward
+ * remainder has no ledger entry: that money was already paid out.
+ */
+export const employeeAdvances = pgTable(
+  'employee_advances',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    employeeId: uuid('employee_id').notNull(),
+    businessDate: date('business_date').notNull(),
+    amountCents: cents('amount_cents').notNull(),
+    note: text('note'),
+    ledgerEntryId: uuid('ledger_entry_id'),
+    settledInRunId: uuid('settled_in_run_id'),
+    createdBy: uuid('created_by').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('employee_advances_shop_employee_idx').on(t.shopId, t.employeeId),
+    foreignKey({
+      name: 'employee_advances_employee_same_shop_fk',
+      columns: [t.employeeId, t.shopId],
+      foreignColumns: [employees.id, employees.shopId],
+    }),
+    foreignKey({
+      name: 'employee_advances_ledger_same_shop_fk',
+      columns: [t.ledgerEntryId, t.shopId],
+      foreignColumns: [ledgerEntries.id, ledgerEntries.shopId],
+    }),
+    foreignKey({
+      name: 'employee_advances_run_same_shop_fk',
+      columns: [t.settledInRunId, t.shopId],
+      foreignColumns: [payrollRuns.id, payrollRuns.shopId],
+    }),
+    check('employee_advances_positive', sql`${t.amountCents} > 0`),
+  ],
+);
+
 /** Who did what, when. Written in the same transaction as the change. */
 export const auditLog = pgTable(
   'audit_log',
@@ -464,6 +604,8 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type DeliverySubmission = typeof deliverySubmissions.$inferSelect;
 export type DeliverySubmissionStatus = (typeof deliverySubmissionStatusEnum.enumValues)[number];
 export type ShiftClose = typeof shiftCloses.$inferSelect;
+export type Employee = typeof employees.$inferSelect;
+export type PayType = (typeof payTypeEnum.enumValues)[number];
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
 export type AuthTokenPurpose = (typeof authTokenPurposeEnum.enumValues)[number];
