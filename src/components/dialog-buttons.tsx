@@ -9,6 +9,7 @@ import {
   EditCustomerForm,
   EditSupplierForm,
   InviteStaffForm,
+  InviteSupplierForm,
   SubscriptionForm,
   SupplierForm,
   type CustomerDetails,
@@ -93,9 +94,21 @@ export function InviteStaffButton() {
     <FormDialog
       trigger={<AddButton label="Invite" />}
       title="Invite a team member"
-      description="Attendants record sales and deliveries at your prices. Owners also set prices, see profit, manage customers and suppliers, and reverse entries."
+      description="Sellers record sales and approve the deliveries suppliers record, at your prices. Owners (admins) also set prices, see profit and reports, manage people, and correct entries. Give a milkman a login from their supplier page."
     >
       {(close) => <InviteStaffForm onDone={close} />}
+    </FormDialog>
+  );
+}
+
+export function InviteSupplierButton({ supplierId, supplierName }: { supplierId: string; supplierName: string }) {
+  return (
+    <FormDialog
+      trigger={<AddButton label="Give them a login" />}
+      title={`A login for ${supplierName}`}
+      description="They record each delivery themselves; your seller checks the litres and approves it. They see only their own deliveries and what you owe them."
+    >
+      {(close) => <InviteSupplierForm supplierId={supplierId} supplierName={supplierName} onDone={close} />}
     </FormDialog>
   );
 }

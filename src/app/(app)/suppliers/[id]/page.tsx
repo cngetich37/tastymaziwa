@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Plus, Wallet } from 'lucide-react';
 import { z } from 'zod';
-import { EditSupplierButton } from '@/components/dialog-buttons';
+import { EditSupplierButton, InviteSupplierButton } from '@/components/dialog-buttons';
+import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/page-header';
 import { RecordDialog } from '@/components/shell/record-dialog';
 import { StatementList } from '@/components/statement-list';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDb } from '@/db';
 import { formatKES } from '@/lib/money';
-import { getStatement, getSupplier } from '@/server/queries';
+import { getStatement, getSupplier, getSupplierLogins } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
 export default async function SupplierPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +21,11 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
   const db = await getDb();
   const supplier = await getSupplier(db, user.shopId, id.data);
   if (!supplier) notFound();
-  const statement = await getStatement(db, user.shopId, { supplierId: supplier.id });
+  const [statement, logins] = await Promise.all([
+    getStatement(db, user.shopId, { supplierId: supplier.id }),
+    getSupplierLogins(db, user.shopId),
+  ]);
+  const login = logins.get(supplier.id);
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -79,8 +84,39 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               {supplier.defaultPricePerLitreCents != null
-                ? 'Attendants record deliveries at this price. Change it with Edit.'
-                : 'Attendants can’t record deliveries from this supplier until you set a price with Edit.'}
+                ? 'Deliveries are approved at this price. Change it with Edit.'
+                : 'Deliveries from this supplier can’t be approved until you set a price with Edit.'}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Their login</CardTitle>
+              <CardDescription>
+                {login
+                  ? 'They record their own deliveries; your seller approves each one.'
+                  : 'Let them record their own deliveries, for your seller to approve.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {login ? (
+                <div className="grid gap-2 text-sm">
+                  <p className="truncate">{login.email}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {!login.active ? (
+                      <Badge variant="secondary">Deactivated</Badge>
+                    ) : login.joined ? (
+                      <Badge>Active</Badge>
+                    ) : (
+                      <Badge variant="outline">Invited</Badge>
+                    )}
+                  </div>
+                  <Link href="/settings" className="w-fit text-primary underline-offset-2 hover:underline">
+                    Manage in Settings
+                  </Link>
+                </div>
+              ) : (
+                <InviteSupplierButton supplierId={supplier.id} supplierName={supplier.name} />
+              )}
             </CardContent>
           </Card>
         </div>

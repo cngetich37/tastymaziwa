@@ -39,7 +39,11 @@ Mark each item done with `[x]` as it ships.
 - [x] **Owner-set prices.** A shop selling price (Settings) and an agreed buying price per supplier. Attendants record litres only, at those prices; owners may override one entry's price. Price changes are audited with the old and new price.
 - [x] **Attendants: sales and deliveries only**, for today only, with no buying prices, costs or profit visible. Enforced in the services and covered by `server/pricing.test.ts`.
 - [x] **Owner setup checklist** on Today until the selling price and supplier prices are set.
+- [x] **Role segregation: supplier records, seller approves, owner oversees.** A supplier (milkman) gets their own login (from their supplier page) and a separate portal at `/supply`: they record the litres they delivered and see each decision and what the shop owes them, nothing else. Their deliveries wait in `delivery_submissions` and don't touch stock or the ledger until the seller (attendant) or owner approves them at the agreed price; a rejection carries a reason the supplier sees. Each delivery is decided once, never by the person who recorded it. Sellers can no longer type in deliveries for a supplier with a login (owners keep an audited override). Covered by `server/deliveries.test.ts` and `e2e/supplier-approval.spec.ts`.
+- [x] **Reports page** (`/reports`, owner): profit & loss, sales by day and payment method, deliveries by supplier, delivery approvals log, debtors with ageing (current / 1–7 / 8–30 / 30+ days late), supplier balances, expenses by category and team activity. Date presets or a custom range (up to a year), CSV download per table and print / save as PDF. Covered by `server/reports.test.ts` and `lib/calc/reports.test.ts`.
 - [ ] Price history view (from the audit log) and scheduled price changes.
+- [ ] Notify the seller (push/SMS) when a supplier records a delivery, and the supplier when it is decided.
+- [ ] Scheduled reports by email (e.g. weekly P&L to the owner).
 - [ ] Per-customer prices (e.g. a wholesale rate for hotels and schools).
 - [ ] Shift handover for attendants: cash counted vs. cash expected, signed off by the owner.
 
@@ -56,7 +60,8 @@ Mark each item done with `[x]` as it ships.
 - [x] **Customer ledger page.** Shows every purchase and payment and the running balance (`/customers/[id]`).
 - [ ] Shareable customer statement (link or PDF).
 - [ ] **Credit limits per customer.** Warn or block when a new credit sale would go over the limit.
-- [ ] **Ageing report** with buckets for current, 1–7, 8–30 and 30+ days, and a "top debtors" card on the dashboard.
+- [x] **Ageing report** with buckets for current, 1–7, 8–30 and 30+ days (Reports → Debtors).
+- [ ] "Top debtors" card on the dashboard.
 - [ ] **Automated reminders** by SMS (Africa's Talking) or WhatsApp (Business API with approved templates). Example: *"Habari Jane, salio lako TastyMaziwa ni KSh 850. Lipa kwa Till 123456."* The reminder includes a link that triggers STK Push.
 - [ ] **Partial payments** applied oldest-first, with a receipt.
 
@@ -77,8 +82,8 @@ Mark each item done with `[x]` as it ships.
 
 ### Expenses and reporting
 - [ ] **Expense tracking** with categories (transport, packaging, electricity/refrigeration, rent, wages) and receipt photos.
-- [ ] **P&L report** for any date range: revenue, cost of milk, spoilage cost, expenses and net profit. Export as CSV or PDF.
-- [ ] **Margin per litre** over time, the single most important number for this business.
+- [x] **P&L report** for any date range: revenue, cost of milk, expenses, gross and net profit, per day, with CSV and print/PDF export. (Spoilage is shown in litres; costing it is still to do.)
+- [x] **Margin per litre** for any period (Reports → Profit & loss). A chart over time is still to do.
 
 ## P2: Standout features
 

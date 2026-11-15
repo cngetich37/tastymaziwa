@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import type { DB } from '@/db/client';
-import { auditLog, shops, users } from '@/db/schema';
+import { auditLog, shops, suppliers, users } from '@/db/schema';
 import { hashPassword } from './password';
 
 export function listUsers(db: DB, shopId: string) {
@@ -13,8 +13,10 @@ export function listUsers(db: DB, shopId: string) {
       active: users.active,
       emailVerifiedAt: users.emailVerifiedAt,
       hasPassword: users.passwordHash,
+      supplierName: suppliers.name,
     })
     .from(users)
+    .leftJoin(suppliers, and(eq(suppliers.id, users.supplierId), eq(suppliers.shopId, users.shopId)))
     .where(eq(users.shopId, shopId))
     .orderBy(asc(users.name))
     .then((rows) => rows.map(({ hasPassword, ...u }) => ({ ...u, hasPassword: hasPassword != null })));

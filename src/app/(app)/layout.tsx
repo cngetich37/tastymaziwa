@@ -6,16 +6,18 @@ import { MobileHeader, MobileTabBar } from '@/components/shell/mobile-shell';
 import { SIDEBAR_COOKIE } from '@/components/shell/nav-items';
 import { getDb } from '@/db';
 import { authConfig } from '@/server/auth/config';
-import { getShop, listCustomers, listSuppliers } from '@/server/queries';
+import { getShop, getSupplierLogins, listCustomers, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
+/** The shop's own pages: owners and sellers. Supplier logins are sent to /supply. */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const db = await getDb();
-  const [shop, customers, suppliers, cookieStore] = await Promise.all([
+  const [shop, customers, suppliers, logins, cookieStore] = await Promise.all([
     getShop(db, user.shopId),
     listCustomers(db, user.shopId),
     listSuppliers(db, user.shopId),
+    getSupplierLogins(db, user.shopId),
     cookies(),
   ]);
   const isOwner = user.role === 'owner';
@@ -34,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       priceSet: s.defaultPricePerLitreCents != null,
       defaultPricePerLitreCents: isOwner ? s.defaultPricePerLitreCents : null,
       payableCents: isOwner ? s.payableCents : undefined,
+      selfRecords: logins.get(s.id)?.active === true,
     })),
   };
 

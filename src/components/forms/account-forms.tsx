@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
+import type { Role } from '@/db/schema';
 import { toast } from '@/hooks/use-toast';
 import { changePasswordSchema, codeField, profileSchema, requestEmailChangeSchema, shopSchema } from '@/lib/validation';
 import { SubmitButton, TextField } from './fields';
@@ -164,7 +165,7 @@ export function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
 export interface TeamMember {
   id: string;
   name: string;
-  role: 'owner' | 'attendant';
+  role: Role;
   active: boolean;
   invited: boolean;
 }
@@ -191,7 +192,7 @@ export function TeamMemberMenu({ member }: { member: TeamMember }) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="truncate">{member.name}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {member.active && (
+        {member.active && member.role !== 'supplier' && (
           <DropdownMenuItem
             onSelect={() => {
               if (
@@ -201,11 +202,11 @@ export function TeamMemberMenu({ member }: { member: TeamMember }) {
                 return;
               run(
                 () => setUserRoleAction({ userId: member.id, role: nextRole }),
-                `${member.name} is now ${nextRole === 'owner' ? 'an owner' : 'an attendant'}`,
+                `${member.name} is now ${nextRole === 'owner' ? 'an owner' : 'a seller'}`,
               );
             }}
           >
-            {nextRole === 'owner' ? 'Make owner' : 'Make attendant'}
+            {nextRole === 'owner' ? 'Make owner' : 'Make seller'}
           </DropdownMenuItem>
         )}
         {member.active && member.invited && (

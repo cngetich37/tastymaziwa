@@ -5,7 +5,7 @@
  * payment callbacks) use route handlers under src/app/api instead.
  */
 import { sessionVersionProof, updateSession } from '@/auth';
-import { ANY_ROLE, OWNER, defineAction } from '@/server/action';
+import { ALL_ROLES, OWNER, STAFF, SUPPLIER, defineAction } from '@/server/action';
 import * as accounts from '@/server/auth/accounts';
 import * as ledger from '@/server/ledger';
 import {
@@ -17,6 +17,9 @@ import {
   confirmEmailChangeSchema,
   expenseSchema,
   inviteStaffSchema,
+  inviteSupplierSchema,
+  reviewDeliverySchema,
+  submitDeliverySchema,
   profileSchema,
   requestEmailChangeSchema,
   shopSchema,
@@ -37,17 +40,30 @@ import {
 
 const idOnly = <T extends { id: string }>(row: T) => ({ id: row.id });
 
-// --- counter entries (owner and attendant) ----------------------------------
+// --- counter entries (owner and seller) ----------------------------------
 // Attendants record quantities only: prices and dates are enforced in the
 // ledger services (see resolvePrice / entryDateFor), not just hidden in the UI.
 
-export const recordSaleAction = defineAction({ schema: saleSchema, roles: ANY_ROLE }, ({ db, actor }, input) =>
+export const recordSaleAction = defineAction({ schema: saleSchema, roles: STAFF }, ({ db, actor }, input) =>
   ledger.recordSale(db, actor, input).then(idOnly),
 );
 
 export const recordDeliveryAction = defineAction(
-  { schema: deliverySchema, roles: ANY_ROLE },
+  { schema: deliverySchema, roles: STAFF },
   ({ db, actor }, input) => ledger.recordDelivery(db, actor, input).then(idOnly),
+);
+
+/** The seller (or owner) approves or rejects a delivery a supplier recorded. */
+export const reviewDeliveryAction = defineAction(
+  { schema: reviewDeliverySchema, roles: STAFF },
+  ({ db, actor }, input) => ledger.reviewDelivery(db, actor, input).then((s) => ({ id: s.id, status: s.status })),
+);
+
+// --- suppliers' own logins ------------------------------------------------------
+
+export const submitDeliveryAction = defineAction(
+  { schema: submitDeliverySchema, roles: SUPPLIER },
+  ({ db, actor }, input) => ledger.submitDelivery(db, actor, input).then(idOnly),
 );
 
 // --- owner only ---------------------------------------------------------------
@@ -117,14 +133,14 @@ export const setSubscriptionStatusAction = defineAction(
     ledger.setSubscriptionStatus(db, actor, input.subscriptionId, input.status).then(idOnly),
 );
 
-// --- your account (any role) --------------------------------------------------
+// --- your account (every role, suppliers included) --------------------------------------------------
 
-export const updateProfileAction = defineAction({ schema: profileSchema, roles: ANY_ROLE }, ({ db, actor }, input) =>
+export const updateProfileAction = defineAction({ schema: profileSchema, roles: ALL_ROLES }, ({ db, actor }, input) =>
   accounts.updateProfile(db, actor, input.name).then(() => null),
 );
 
 export const changePasswordAction = defineAction(
-  { schema: changePasswordSchema, roles: ANY_ROLE },
+  { schema: changePasswordSchema, roles: ALL_ROLES },
   async ({ db, actor }, input) => {
     const version = await accounts.changePassword(db, actor, input.currentPassword, input.password);
     // Other sessions are now invalid; keep this one alive with a signed proof.
@@ -134,12 +150,12 @@ export const changePasswordAction = defineAction(
 );
 
 export const requestEmailChangeAction = defineAction(
-  { schema: requestEmailChangeSchema, roles: ANY_ROLE },
+  { schema: requestEmailChangeSchema, roles: ALL_ROLES },
   ({ db, actor, ip }, input) => accounts.requestEmailChange(db, actor, input.email, ip).then(() => null),
 );
 
 export const confirmEmailChangeAction = defineAction(
-  { schema: confirmEmailChangeSchema, roles: ANY_ROLE },
+  { schema: confirmEmailChangeSchema, roles: ALL_ROLES },
   ({ db, actor }, input) => accounts.confirmEmailChange(db, actor, input.email, input.code).then(() => null),
 );
 
@@ -151,6 +167,11 @@ export const renameShopAction = defineAction({ schema: shopSchema, roles: OWNER 
 
 export const inviteStaffAction = defineAction({ schema: inviteStaffSchema, roles: OWNER }, ({ db, actor }, input) =>
   accounts.inviteStaff(db, actor, input).then(idOnly),
+);
+
+export const inviteSupplierAction = defineAction(
+  { schema: inviteSupplierSchema, roles: OWNER },
+  ({ db, actor }, input) => accounts.inviteSupplier(db, actor, input).then(idOnly),
 );
 
 export const setUserActiveAction = defineAction({ schema: userActiveSchema, roles: OWNER }, ({ db, actor }, input) =>

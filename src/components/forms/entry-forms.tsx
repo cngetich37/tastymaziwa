@@ -8,13 +8,16 @@ import {
   createSubscriptionAction,
   createSupplierAction,
   inviteStaffAction,
+  inviteSupplierAction,
   recordCustomerPaymentAction,
   recordDeliveryAction,
   recordExpenseAction,
   recordSaleAction,
   recordSpoilageAction,
   recordSupplierPaymentAction,
+  reviewDeliveryAction,
   setSalePriceAction,
+  submitDeliveryAction,
   updateCustomerAction,
   updateSupplierAction,
 } from '@/app/actions';
@@ -28,9 +31,12 @@ import {
   deliverySchema,
   expenseSchema,
   inviteStaffSchema,
+  inviteSupplierSchema,
+  reviewDeliverySchema,
   salePriceSchema,
   saleSchema,
   spoilageSchema,
+  submitDeliverySchema,
   subscriptionSchema,
   supplierPaymentSchema,
   supplierSchema,
@@ -55,6 +61,8 @@ export interface SupplierOption {
   priceSet: boolean;
   /** Only sent to owners: what the shop owes this supplier. */
   payableCents?: number;
+  /** Has their own login: records their deliveries, which the seller approves. */
+  selfRecords: boolean;
 }
 
 interface FormProps {
@@ -207,7 +215,7 @@ export function SaleForm({
             description={
               salePriceCents != null
                 ? `Shop price ${formatKES(salePriceCents)}. A change here is for this sale only.`
-                : 'Set a shop price in Settings so attendants can sell.'
+                : 'Set a shop price in Settings so sellers can sell.'
             }
           />
         ) : (
@@ -243,6 +251,10 @@ export function DeliveryForm({
   onDone,
 }: FormProps &
   DatedProps & { suppliers: SupplierOption[]; canEditPrice: boolean; defaultSupplierId?: string }) {
+  // Sellers only type in deliveries for suppliers without their own login;
+  // the rest record their own, and the seller approves them instead.
+  const allSuppliers = suppliers;
+  suppliers = canEditPrice ? allSuppliers : allSuppliers.filter((s) => !s.selfRecords);
   const initial = suppliers.find((s) => s.id === defaultSupplierId) ?? suppliers[0];
   const { form, onSubmit, pending } = useActionForm(
     deliverySchema,
@@ -267,7 +279,15 @@ export function DeliveryForm({
     form.setValue('pricePerLitre', priceString(supplier?.defaultPricePerLitreCents));
   }, [canEditPrice, supplierId, supplier, form]);
 
-  if (suppliers.length === 0) return <NoSuppliers />;
+  if (allSuppliers.length === 0) return <NoSuppliers />;
+  if (suppliers.length === 0) {
+    return (
+      <Notice>
+        Your suppliers record their own deliveries. Check the litres and approve them under{' '}
+        <strong>Deliveries → Waiting for approval</strong>.
+      </Notice>
+    );
+  }
 
   return (
     <Form {...form}>
@@ -281,6 +301,11 @@ export function DeliveryForm({
           />
         )}
         <TextField name="litres" label="Litres received" kind="litres" autoFocus />
+        {canEditPrice && supplier?.selfRecords && (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+            {supplier.name} records their own deliveries for approval. Only record one here if they can&apos;t.
+          </p>
+        )}
         {canEditPrice ? (
           <>
             <TextField
@@ -290,7 +315,7 @@ export function DeliveryForm({
               description={
                 supplier?.defaultPricePerLitreCents != null
                   ? `Agreed price ${formatKES(supplier.defaultPricePerLitreCents)}. A change here is for this delivery only.`
-                  : 'No agreed price yet: set one on the supplier page so attendants can record deliveries.'
+                  : 'No agreed price yet: set one on the supplier page so deliveries can be recorded and approved.'
               }
             />
             <TotalLine cents={previewTotalCents(litres, parsePrice(price))} />
@@ -304,6 +329,90 @@ export function DeliveryForm({
           )
         )}
         <SubmitButton pending={pending}>Record delivery</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+// --- supplier-recorded deliveries ---------------------------------------------
+
+/** The supplier's own form: litres only, at the price agreed with the shop. */
+export function SubmitDeliveryForm({ priceCents, onDone }: FormProps & { priceCents: number | null }) {
+  const { form, onSubmit, pending } = useActionForm(
+    submitDeliverySchema,
+    submitDeliveryAction,
+    { litres: '', note: '' },
+    { success: 'Sent to the shop for approval', onSuccess: onDone },
+  );
+  const litres = form.watch('litres');
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <TextField
+          name="litres"
+          label="Litres delivered"
+          kind="litres"
+          presets={litrePresets(['10', '20', '40', '50'])}
+        />
+        <TextField name="note" label="Note (optional)" description="e.g. Morning run, 2 cans" />
+        {priceCents != null && (
+          <TotalLine
+            cents={previewTotalCents(litres, priceCents)}
+            detail={`At the agreed ${formatKES(priceCents)} per litre, once approved`}
+          />
+        )}
+        <SubmitButton pending={pending}>Send for approval</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+/** The seller sends a supplier's delivery back: the reason is shown to the supplier. */
+export function RejectDeliveryForm({ submissionId, onDone }: FormProps & { submissionId: string }) {
+  const { form, onSubmit, pending } = useActionForm(
+    reviewDeliverySchema,
+    reviewDeliveryAction,
+    { submissionId, decision: 'reject', reason: '' },
+    { success: 'Delivery sent back to the supplier', onSuccess: onDone },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <TextField
+          name="reason"
+          label="What was wrong?"
+          autoFocus
+          description="The supplier sees this and records the delivery again."
+        />
+        <SubmitButton pending={pending}>Reject delivery</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+/** Gives a supplier their own login to record deliveries. */
+export function InviteSupplierForm({
+  supplierId,
+  supplierName,
+  onDone,
+}: FormProps & { supplierId: string; supplierName: string }) {
+  const { form, onSubmit, pending } = useActionForm(
+    inviteSupplierSchema,
+    inviteSupplierAction,
+    { supplierId, name: supplierName, email: '' },
+    { success: 'Invite sent', onSuccess: onDone },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <TextField name="name" label="Their name" />
+        <TextField
+          name="email"
+          label="Email"
+          kind="email"
+          description="They'll get a link to set a password, or can sign in with an emailed code."
+        />
+        <SubmitButton pending={pending}>Send invite</SubmitButton>
       </form>
     </Form>
   );
@@ -531,7 +640,7 @@ export function SupplierForm({ onDone }: FormProps) {
           name="defaultPricePerLitre"
           label="Agreed price / litre"
           kind="money"
-          description="Attendants record deliveries at this price. You can add it later."
+          description="Deliveries are recorded and approved at this price. You can add it later."
         />
         <SubmitButton pending={pending}>Add supplier</SubmitButton>
       </form>
@@ -612,8 +721,8 @@ export function InviteStaffForm({ onDone }: FormProps) {
           name="role"
           label="Role"
           options={[
-            { value: 'attendant', label: 'Attendant' },
-            { value: 'owner', label: 'Owner' },
+            { value: 'attendant', label: 'Seller' },
+            { value: 'owner', label: 'Owner (admin)' },
           ]}
         />
         <SubmitButton pending={pending}>Send invite</SubmitButton>

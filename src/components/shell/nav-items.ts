@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  ChartColumn,
   LayoutDashboard,
   Milk,
   Settings,
@@ -28,16 +29,17 @@ export const DELIVERIES: NavItem = { href: '/deliveries', label: 'Deliveries', i
 export const CUSTOMERS: NavItem = { href: '/customers', label: 'Customers', icon: Users, ownerOnly: true };
 export const SUPPLIERS: NavItem = { href: '/suppliers', label: 'Suppliers', icon: Milk, ownerOnly: true };
 export const LEDGER: NavItem = { href: '/ledger', label: 'Ledger', icon: BookOpen, ownerOnly: true };
+export const REPORTS: NavItem = { href: '/reports', label: 'Reports', icon: ChartColumn, ownerOnly: true };
 export const SETTINGS: NavItem = { href: '/settings', label: 'Settings', icon: Settings, ownerOnly: true };
 
 /**
  * Follows the shop's day: what happens at the counter, who the shop trades
- * with, then the books. Attendants only see the counter.
+ * with, then the books. Sellers only see the counter.
  */
 const NAV_GROUPS: NavGroup[] = [
   { label: 'Counter', items: [TODAY, SALES, DELIVERIES] },
   { label: 'People', items: [CUSTOMERS, SUPPLIERS] },
-  { label: 'Books', items: [LEDGER, SETTINGS] },
+  { label: 'Books', items: [REPORTS, LEDGER, SETTINGS] },
 ];
 
 export const navGroupsFor = (role: Role): NavGroup[] =>

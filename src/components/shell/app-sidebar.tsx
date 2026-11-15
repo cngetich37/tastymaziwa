@@ -9,6 +9,7 @@ import { Logo } from '@/components/logo';
 import { ThemeSwitcher, ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import type { Role } from '@/db/schema';
+import { ROLE_LABELS } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 import { SIDEBAR_COOKIE, initials, isActive, navGroupsFor } from './nav-items';
 import { RecordDialog } from './record-dialog';
@@ -135,7 +136,7 @@ export function SidebarBody({
           <Avatar name={user.name} />
           <span className={cn('min-w-0 text-left', collapsed && 'sr-only')}>
             <span className="block truncate font-semibold text-foreground">{user.name}</span>
-            <span className="block text-xs capitalize text-muted-foreground">{user.role} · Account</span>
+            <span className="block text-xs text-muted-foreground">{ROLE_LABELS[user.role]} · Account</span>
           </span>
         </Link>
         <button
@@ -202,7 +203,7 @@ export function DesktopSidebar({
     <aside
       data-collapsed={collapsed}
       className={cn(
-        'sticky top-0 hidden h-dvh shrink-0 border-r bg-card transition-[width] duration-200 md:block',
+        'sticky top-0 hidden h-dvh shrink-0 border-r bg-card transition-[width] duration-200 md:block print:hidden',
         collapsed ? 'w-[4.5rem]' : 'w-64',
       )}
     >

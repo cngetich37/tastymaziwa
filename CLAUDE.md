@@ -51,8 +51,9 @@ npm run db:studio      # browse the database
 ```
 src/
   app/
-    (app)/            signed-in pages: / (Today), /sales, /deliveries (per day, ?date= for owners),
-                      /customers[/id], /suppliers[/id], /ledger, /settings (owner), /account
+    (app)/            shop pages (owner + seller): / (Today), /sales, /deliveries (per day, ?date= for owners),
+                      /customers[/id], /suppliers[/id], /ledger, /reports, /settings (owner), /account
+    (supplier)/       a supplier login's own pages: /supply (record deliveries), /supply/account
     (auth)/           signed-out pages: /login, /signup, /forgot-password, /reset-password
     actions.ts        signed-in server actions, each wrapped in defineAction
     auth-actions.ts   signed-out server actions (definePublicAction): sign-up, codes, reset
@@ -64,7 +65,9 @@ src/
     index.ts          getDb() for app code (server-only, cached on globalThis)
   server/             server-only logic
     ledger.ts         every ledger WRITE: one DB transaction + audit row each
+                      (incl. submitDelivery / reviewDelivery for supplier deliveries)
     queries.ts        read models (SQL aggregates → pure calc functions)
+    reports.ts        the Reports page: one function per report → stats + tables
     action.ts         defineAction / definePublicAction: auth + role + Zod + errors
     session.ts        currentUser / requireUser(roles) -> { id, role, shopId, ... }
     auth/             accounts.ts (all auth flows), tokens.ts (codes/links),
@@ -73,7 +76,9 @@ src/
   lib/                isomorphic and pure: safe on the client
     money.ts          cents/millilitre parsing, line totals, formatting
     dates.ts          Africa/Nairobi business dates
-    calc/             summarize, balances, dailySeries, FIFO credit allocation
+    calc/             summarize, balances, dailySeries, FIFO credit allocation,
+                      reports (date ranges, ageing, margin per litre, CSV)
+    roles.ts          STAFF / OWNER / SUPPLIER / ALL_ROLES, homeFor(role), labels
     validation.ts     Zod schemas + Kenyan phone normalisation
   components/
     forms/            entry-forms.tsx (all forms), fields.tsx, use-action-form.ts
@@ -84,7 +89,7 @@ scripts/              seed, migrate (run with tsx)
 
 ## Multi-tenancy: every row belongs to a shop
 
-`shops` is the tenant. `users`, `customers`, `suppliers`, `subscriptions`, `ledger_entries` and `audit_log` all have `shop_id`. **This is the rule that must never break: one shop must never see or change another shop's data.**
+`shops` is the tenant. `users`, `customers`, `suppliers`, `subscriptions`, `ledger_entries`, `delivery_submissions` and `audit_log` all have `shop_id`. **This is the rule that must never break: one shop must never see or change another shop's data.**
 
 - **Every query filters by `shopId`, and every insert sets it.** Services get it from `actor.shopId`; queries take `shopId` as their second argument. Take it from the session (`requireUser()` / `defineAction`), **never from client input**.
 - **Look up by id *and* shop:** `where(and(eq(t.id, id), eq(t.shopId, actor.shopId)))`. A bare `eq(t.id, id)` on a client-supplied id is a cross-tenant bug.
@@ -116,7 +121,7 @@ Security rules for auth code:
 
 | kind | meaning | sign of money |
 |---|---|---|
-| `delivery` | milk bought from a supplier (adds to what the shop owes them) | cost |
+| `delivery` | milk bought from a supplier (adds to what the shop owes them); supplier-recorded ones arrive here only on approval | cost |
 | `sale` | milk sold; `payment_method` is `cash`, `mpesa` or `credit` (credit needs `customer_id`) | revenue |
 | `customer_payment` | customer pays down credit (`cash`/`mpesa`) | in |
 | `supplier_payment` | shop pays the milkman | out |
@@ -149,7 +154,8 @@ The database enforces these rules. Don't work around them:
 - Signed-out actions go in `src/app/auth-actions.ts` with `definePublicAction`, and must rate-limit.
 - Business-rule failures throw `DomainError`; its message is shown to the user. Anything else is logged and gets a generic error.
 - **Route handlers only for external callers** (cron, future M-Pesa callbacks). They do their own auth: a bearer secret compared with `timingSafeEqual`, or a signature check.
-- Roles: an **attendant** records sales and deliveries only: litres, payment method and (for credit) the customer, dated today. Prices come from the owner: the shop's selling price (`shops.sale_price_per_litre_cents`, set in Settings) and each supplier's agreed price. Attendants never see buying prices, delivery costs, profit, customers' or suppliers' pages, or the ledger. An **owner** does everything else: sets prices (and may override the price of one entry), records payments, spoilage and expenses, dates entries on past days, reverses entries, and manages customers, suppliers, subscriptions and users.
+- Roles (`src/lib/roles.ts`; the UI calls them Owner, Seller, Supplier): a **supplier** login is linked to one `suppliers` row (`users.supplier_id`, enforced by a CHECK) and only uses `/supply`: it records litres delivered (`submitDelivery`, dated today, for its own supplier only) and sees its own deliveries and payable. It never writes the ledger. Its deliveries reach the ledger only when a seller or owner approves them (`reviewDelivery`, once, never by the submitter); rejecting needs a reason. `requireUser()` defaults to `STAFF` and redirects other roles to `homeFor(role)`, so shop pages are closed to suppliers by default; supplier pages pass `SUPPLIER`.
+- An **attendant** (seller) records sales, approves supplier deliveries, and types in deliveries only for suppliers without their own login: litres, payment method and (for credit) the customer, dated today. Prices come from the owner: the shop's selling price (`shops.sale_price_per_litre_cents`, set in Settings) and each supplier's agreed price. Attendants never see buying prices, delivery costs, profit, customers' or suppliers' pages, or the ledger. An **owner** does everything else: sets prices (and may override the price of one entry), records payments, spoilage and expenses, dates entries on past days, reverses entries, and manages customers, suppliers, subscriptions and users.
 - **Prices and dates are enforced in the services** (`resolvePrice` / `entryDateFor` in `server/ledger.ts`), not only hidden in the UI. Page data for attendants must not carry costs either (see `app/(app)/layout.tsx`).
 
 ### Reading data

@@ -130,6 +130,26 @@ export const deliverySchema = z.object({
   note: optionalText(),
 });
 
+// --- supplier-recorded deliveries ---------------------------------------------
+
+/** A supplier records what they delivered: litres only, dated today by the server. */
+export const submitDeliverySchema = z.object({
+  litres: litresField(),
+  note: optionalText(),
+});
+
+/** The seller's decision on a supplier's delivery. Rejecting needs a reason. */
+export const reviewDeliverySchema = z
+  .object({
+    submissionId: id,
+    decision: z.enum(['approve', 'reject']),
+    reason: optionalText(200),
+  })
+  .refine((v) => v.decision !== 'reject' || v.reason, {
+    error: 'Say what was wrong, e.g. "Only 38 L arrived"',
+    path: ['reason'],
+  });
+
 export const customerPaymentSchema = z.object({
   customerId: id,
   amount: kesField(),
@@ -295,6 +315,27 @@ export const userRoleSchema = z.object({
 
 export const resendInviteSchema = z.object({ userId: id });
 
+/** Give a supplier (milkman) their own login, to record their deliveries. */
+export const inviteSupplierSchema = z.object({
+  supplierId: id,
+  name: personName,
+  email: emailField,
+});
+
+// --- reports --------------------------------------------------------------------
+
+export const REPORT_TYPES = [
+  'profit',
+  'sales',
+  'deliveries',
+  'approvals',
+  'debtors',
+  'suppliers',
+  'expenses',
+  'staff',
+] as const;
+export type ReportType = (typeof REPORT_TYPES)[number];
+
 export type SaleInput = z.output<typeof saleSchema>;
 export type DeliveryInput = z.output<typeof deliverySchema>;
 export type CustomerPaymentInput = z.output<typeof customerPaymentSchema>;
@@ -308,3 +349,6 @@ export type UpdateSupplierInput = z.output<typeof updateSupplierSchema>;
 export type SubscriptionInput = z.output<typeof subscriptionSchema>;
 export type SignupInput = z.output<typeof signupSchema>;
 export type InviteStaffInput = z.output<typeof inviteStaffSchema>;
+export type InviteSupplierInput = z.output<typeof inviteSupplierSchema>;
+export type SubmitDeliveryInput = z.output<typeof submitDeliverySchema>;
+export type ReviewDeliveryInput = z.output<typeof reviewDeliverySchema>;

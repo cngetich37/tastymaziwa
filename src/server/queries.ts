@@ -8,7 +8,7 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DB } from '@/db/client';
-import { customers, ledgerEntries, shops, subscriptions, suppliers, users } from '@/db/schema';
+import { customers, deliverySubmissions, ledgerEntries, shops, subscriptions, suppliers, users } from '@/db/schema';
 import { allocatePayments, type AllocatedCreditSale } from '@/lib/calc/allocation';
 import { withRunningBalance } from '@/lib/calc/statement';
 import {
@@ -424,6 +424,116 @@ export async function getStatement(
   return withRunningBalance(rows, 'customerId' in party ? 'customer' : 'supplier')
     .reverse()
     .slice(0, limit);
+}
+
+// --- supplier-recorded deliveries ---------------------------------------------
+
+export interface DeliverySubmissionItem {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  businessDate: BusinessDate;
+  submittedAt: Date;
+  volumeMl: number;
+  note: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedByName: string;
+  reviewedByName: string | null;
+  reviewedAt: Date | null;
+  reviewNote: string | null;
+}
+
+/**
+ * Supplier deliveries, newest first. `pending` is the seller's to-do list;
+ * a date range feeds the approvals report; `supplierId` is a supplier's own view.
+ */
+export async function listDeliverySubmissions(
+  db: DB,
+  shopId: string,
+  filter: {
+    status?: DeliverySubmissionItem['status'];
+    supplierId?: string;
+    from?: BusinessDate;
+    to?: BusinessDate;
+    limit?: number;
+  } = {},
+): Promise<DeliverySubmissionItem[]> {
+  const submitter = alias(users, 'submitter');
+  const reviewer = alias(users, 'reviewer');
+  return db
+    .select({
+      id: deliverySubmissions.id,
+      supplierId: deliverySubmissions.supplierId,
+      supplierName: suppliers.name,
+      businessDate: deliverySubmissions.businessDate,
+      submittedAt: deliverySubmissions.submittedAt,
+      volumeMl: deliverySubmissions.volumeMl,
+      note: deliverySubmissions.note,
+      status: deliverySubmissions.status,
+      submittedByName: submitter.name,
+      reviewedByName: reviewer.name,
+      reviewedAt: deliverySubmissions.reviewedAt,
+      reviewNote: deliverySubmissions.reviewNote,
+    })
+    .from(deliverySubmissions)
+    .innerJoin(suppliers, eq(suppliers.id, deliverySubmissions.supplierId))
+    .innerJoin(submitter, eq(submitter.id, deliverySubmissions.submittedBy))
+    .leftJoin(reviewer, eq(reviewer.id, deliverySubmissions.reviewedBy))
+    .where(
+      and(
+        eq(deliverySubmissions.shopId, shopId),
+        filter.status ? eq(deliverySubmissions.status, filter.status) : undefined,
+        filter.supplierId ? eq(deliverySubmissions.supplierId, filter.supplierId) : undefined,
+        filter.from ? gte(deliverySubmissions.businessDate, filter.from) : undefined,
+        filter.to ? lte(deliverySubmissions.businessDate, filter.to) : undefined,
+      ),
+    )
+    .orderBy(desc(deliverySubmissions.submittedAt))
+    .limit(filter.limit ?? 200);
+}
+
+/** Supplier ids in this shop that have their own login (active or not), with its state. */
+export async function getSupplierLogins(db: DB, shopId: string) {
+  const rows = await db
+    .select({
+      supplierId: users.supplierId,
+      userId: users.id,
+      email: users.email,
+      active: users.active,
+      joined: sql<boolean>`${users.passwordHash} is not null or ${users.emailVerifiedAt} is not null`,
+    })
+    .from(users)
+    .where(and(eq(users.shopId, shopId), eq(users.role, 'supplier')));
+  return new Map(rows.map(({ supplierId, ...login }) => [supplierId!, login]));
+}
+
+/**
+ * Everything a supplier's own page shows: who they are to this shop, their
+ * agreed price, what the shop owes them, and their recent deliveries with
+ * the seller's decision. Scoped to the supplier the login belongs to.
+ */
+export async function getSupplierPortal(db: DB, shopId: string, userId: string) {
+  const [me] = await db
+    .select({ supplierId: users.supplierId })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.shopId, shopId)));
+  if (!me?.supplierId) return null;
+  const [supplier, shop, submissions] = await Promise.all([
+    getSupplier(db, shopId, me.supplierId),
+    getShop(db, shopId),
+    listDeliverySubmissions(db, shopId, { supplierId: me.supplierId, limit: 60 }),
+  ]);
+  if (!supplier) return null;
+  return {
+    supplier: {
+      id: supplier.id,
+      name: supplier.name,
+      pricePerLitreCents: supplier.defaultPricePerLitreCents,
+      payableCents: supplier.payableCents,
+    },
+    shopName: shop?.name ?? 'TastyMaziwa',
+    submissions,
+  };
 }
 
 // --- shop ---------------------------------------------------------------------

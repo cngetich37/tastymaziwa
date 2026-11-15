@@ -3,15 +3,17 @@
  * function runs in one DB transaction and writes an audit row alongside the
  * change. Callers (server actions, cron routes, scripts) handle auth.
  */
-import { and, eq, lte } from 'drizzle-orm';
+import { and, eq, lte, sql } from 'drizzle-orm';
 import type { DB, Tx } from '@/db/client';
 import {
   auditLog,
   customers,
+  deliverySubmissions,
   ledgerEntries,
   shops,
   subscriptions,
   suppliers,
+  users,
   type LedgerEntry,
   type NewLedgerEntry,
   type Role,
@@ -23,8 +25,10 @@ import type {
   CustomerPaymentInput,
   DeliveryInput,
   ExpenseInput,
+  ReviewDeliveryInput,
   SaleInput,
   SpoilageInput,
+  SubmitDeliveryInput,
   SubscriptionInput,
   SupplierInput,
   SupplierPaymentInput,
@@ -61,7 +65,14 @@ const DEFAULT_CREDIT_DAYS = 7;
  */
 const isManager = (actor: Actor) => actor.role === 'owner' || actor.role === 'system';
 
+/** Suppliers only ever submit deliveries for the shop to approve; never ledger entries. */
+function assertShopActor(actor: Actor) {
+  if (actor.role === 'supplier') throw new DomainError('You do not have permission to do that.');
+}
+
+/** Every ledger entry service starts here, so it also refuses supplier logins up front. */
 function entryDateFor(actor: Actor, date: BusinessDate | undefined): BusinessDate {
+  assertShopActor(actor);
   const today = todayBusinessDate();
   if (date && date !== today && !isManager(actor)) {
     throw new DomainError('Only the owner can record entries for another day');
@@ -88,6 +99,7 @@ async function audit(
 }
 
 async function insertEntry(tx: Tx, actor: Actor, values: Omit<NewLedgerEntry, 'shopId'>): Promise<LedgerEntry> {
+  assertShopActor(actor);
   const [entry] = await tx
     .insert(ledgerEntries)
     .values({ ...values, shopId: actor.shopId, createdBy: actor.id })
@@ -171,14 +183,39 @@ export function recordSale(db: DB, actor: Actor, input: SaleInput) {
   });
 }
 
+/** Whether a supplier has an active login of their own (and so records their own deliveries). */
+async function supplierHasLogin(tx: Tx, actor: Actor, supplierId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.supplierId, supplierId), eq(users.shopId, actor.shopId), eq(users.active, true)));
+  return row != null;
+}
+
+function deliveryPrice(actor: Actor, requested: number | undefined, supplier: { name: string; price: number | null }) {
+  return resolvePrice(actor, requested, supplier.price, {
+    manager: `Set ${supplier.name}'s price per litre first, or type a price`,
+    staff: `The owner has not set ${supplier.name}'s price per litre yet`,
+  });
+}
+
+/**
+ * Milk received, typed in by the shop. A supplier with their own login
+ * records their deliveries themselves and the seller approves them
+ * (submitDelivery / reviewDelivery), so attendants can't also type one in.
+ * The owner still can (e.g. the milkman's phone is broken); it is audited.
+ */
 export function recordDelivery(db: DB, actor: Actor, input: DeliveryInput) {
   return db.transaction(async (tx) => {
+    if (actor.role === 'supplier') throw new DomainError('Record your delivery from your own page');
     const businessDate = entryDateFor(actor, input.date);
     const supplier = await assertSupplier(tx, actor, input.supplierId);
-    const price = resolvePrice(actor, input.pricePerLitre, supplier.price, {
-      manager: `Set ${supplier.name}'s price per litre first, or type a price`,
-      staff: `The owner has not set ${supplier.name}'s price per litre yet`,
-    });
+    if (!isManager(actor) && (await supplierHasLogin(tx, actor, input.supplierId))) {
+      throw new DomainError(
+        `${supplier.name} records their own deliveries. Approve it under "Waiting for approval" instead.`,
+      );
+    }
+    const price = deliveryPrice(actor, input.pricePerLitre, supplier);
     return insertEntry(tx, actor, {
       kind: 'delivery',
       businessDate,
@@ -188,6 +225,103 @@ export function recordDelivery(db: DB, actor: Actor, input: DeliveryInput) {
       supplierId: input.supplierId,
       note: input.note,
     });
+  });
+}
+
+// --- supplier-recorded deliveries ---------------------------------------------
+
+/**
+ * A supplier records the litres they just delivered. Nothing reaches the
+ * ledger (or stock) until the seller approves it. Always dated today, and
+ * always for the supplier this login belongs to: never taken from input.
+ */
+export function submitDelivery(db: DB, actor: Actor, input: SubmitDeliveryInput) {
+  return db.transaction(async (tx) => {
+    if (actor.role !== 'supplier' || !actor.id) throw new DomainError('Only suppliers record deliveries here');
+    const [me] = await tx
+      .select({ supplierId: users.supplierId })
+      .from(users)
+      .where(and(eq(users.id, actor.id), eq(users.shopId, actor.shopId), eq(users.active, true)));
+    if (!me?.supplierId) throw new DomainError('Your login is not linked to a supplier');
+    await assertSupplier(tx, actor, me.supplierId);
+    const [submission] = await tx
+      .insert(deliverySubmissions)
+      .values({
+        shopId: actor.shopId,
+        supplierId: me.supplierId,
+        businessDate: todayBusinessDate(),
+        volumeMl: input.litres,
+        note: input.note ?? null,
+        submittedBy: actor.id,
+      })
+      .returning();
+    await audit(tx, actor, 'delivery.submit', 'delivery_submission', submission.id, {
+      supplierId: submission.supplierId,
+      volumeMl: submission.volumeMl,
+      businessDate: submission.businessDate,
+    });
+    return submission;
+  });
+}
+
+/**
+ * The seller checks a supplier's delivery against what arrived. Approving
+ * posts it to the ledger at the supplier's agreed price, on the day and time
+ * it was delivered; rejecting sends it back with a reason, and the supplier
+ * records it again. Each delivery is decided once, by someone other than
+ * the person who recorded it.
+ */
+export function reviewDelivery(db: DB, actor: Actor, input: ReviewDeliveryInput) {
+  return db.transaction(async (tx) => {
+    if (actor.role !== 'owner' && actor.role !== 'attendant') {
+      throw new DomainError('Only the shop can approve deliveries');
+    }
+    const [submission] = await tx
+      .select()
+      .from(deliverySubmissions)
+      .where(and(eq(deliverySubmissions.id, input.submissionId), eq(deliverySubmissions.shopId, actor.shopId)))
+      // Two sellers tapping at once: the second waits, then sees it is decided.
+      .for('update');
+    if (!submission) throw new DomainError('Delivery not found');
+    if (submission.status !== 'pending') throw new DomainError(`This delivery was already ${submission.status}`);
+    if (submission.submittedBy === actor.id) throw new DomainError("You can't approve a delivery you recorded");
+
+    let ledgerEntryId: string | null = null;
+    if (input.decision === 'approve') {
+      const supplier = await assertSupplier(tx, actor, submission.supplierId);
+      const price = deliveryPrice(actor, undefined, supplier);
+      const entry = await insertEntry(tx, actor, {
+        kind: 'delivery',
+        businessDate: submission.businessDate,
+        occurredAt: submission.submittedAt,
+        volumeMl: submission.volumeMl,
+        unitPriceCents: price,
+        amountCents: lineTotalCents(submission.volumeMl, price),
+        supplierId: submission.supplierId,
+        note: submission.note,
+        idempotencyKey: `delivery-sub:${submission.id}`,
+      });
+      ledgerEntryId = entry.id;
+    }
+
+    const [reviewed] = await tx
+      .update(deliverySubmissions)
+      .set({
+        status: input.decision === 'approve' ? 'approved' : 'rejected',
+        reviewedBy: actor.id,
+        reviewedAt: sql`now()`,
+        reviewNote: input.reason ?? null,
+        ledgerEntryId,
+      })
+      .where(and(eq(deliverySubmissions.id, submission.id), eq(deliverySubmissions.shopId, actor.shopId)))
+      .returning();
+    await audit(tx, actor, `delivery.${reviewed.status === 'approved' ? 'approve' : 'reject'}`, 'delivery_submission', reviewed.id, {
+      volumeMl: reviewed.volumeMl,
+      supplierId: reviewed.supplierId,
+      reason: reviewed.reviewNote,
+      ledgerEntryId,
+    });
+    return reviewed;
   });
 }
 

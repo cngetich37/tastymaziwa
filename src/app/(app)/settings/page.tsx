@@ -6,6 +6,7 @@ import { ShopNameForm, TeamMemberMenu } from '@/components/forms/account-forms';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDb } from '@/db';
+import { ROLE_LABELS } from '@/lib/roles';
 import { getShop } from '@/server/queries';
 import { requireUser } from '@/server/session';
 import { listUsers } from '@/server/users';
@@ -36,7 +37,7 @@ export default async function SettingsPage() {
           <CardHeader>
             <CardTitle>Selling price</CardTitle>
             <CardDescription>
-              Attendants sell at this price and can&apos;t change it. Buying prices are set per supplier on the{' '}
+              Sellers sell at this price and can&apos;t change it. Buying prices are set per supplier on the{' '}
               <Link href="/suppliers" className="underline underline-offset-2">
                 Suppliers
               </Link>{' '}
@@ -52,7 +53,7 @@ export default async function SettingsPage() {
           <CardHeader className="flex-row items-center justify-between">
             <div>
               <CardTitle>Team</CardTitle>
-              <CardDescription>People who can sign in to this shop.</CardDescription>
+              <CardDescription>People who can sign in to this shop, including suppliers with their own login.</CardDescription>
             </div>
             <InviteStaffButton />
           </CardHeader>
@@ -70,8 +71,9 @@ export default async function SettingsPage() {
                       </p>
                       <p className="truncate text-xs text-muted-foreground">{u.email}</p>
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        <Badge variant={u.role === 'owner' ? 'default' : 'outline'} className="capitalize">
-                          {u.role}
+                        <Badge variant={u.role === 'owner' ? 'default' : 'outline'}>
+                          {ROLE_LABELS[u.role]}
+                          {u.role === 'supplier' && u.supplierName && <> · {u.supplierName}</>}
                         </Badge>
                         {u.active && invited && <Badge variant="outline">Invited</Badge>}
                         {!u.active && <Badge variant="secondary">Deactivated</Badge>}

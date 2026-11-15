@@ -23,7 +23,8 @@ const cents = (name: string) => bigint(name, { mode: 'number' });
 const millilitres = (name: string) => bigint(name, { mode: 'number' });
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
-export const roleEnum = pgEnum('role', ['owner', 'attendant']);
+/** owner = the shop's admin; attendant = the milk seller; supplier = a milkman's own login. */
+export const roleEnum = pgEnum('role', ['owner', 'attendant', 'supplier']);
 
 export const entryKindEnum = pgEnum('entry_kind', [
   'delivery', // milk bought in from a supplier (adds to payable)
@@ -35,6 +36,12 @@ export const entryKindEnum = pgEnum('entry_kind', [
 ]);
 
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'mpesa', 'credit']);
+
+export const deliverySubmissionStatusEnum = pgEnum('delivery_submission_status', [
+  'pending', // recorded by the supplier, waiting for the seller
+  'approved', // the seller confirmed the litres; posted to the ledger
+  'rejected', // the litres were wrong; the supplier records it again
+]);
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'active',
@@ -78,12 +85,23 @@ export const users = pgTable(
     /** Null until the user sets one (invited staff, passwordless-only users). */
     passwordHash: text('password_hash'),
     role: roleEnum('role').notNull().default('attendant'),
+    /** Set only for supplier logins: the supplier (milkman) this person is. */
+    supplierId: uuid('supplier_id').unique(),
     active: boolean('active').notNull().default(true),
     /** Bumped on password reset/change; older sessions are rejected. */
     sessionVersion: integer('session_version').notNull().default(0),
     createdAt: createdAt(),
   },
-  (t) => [index('users_shop_idx').on(t.shopId)],
+  (t) => [
+    index('users_shop_idx').on(t.shopId),
+    foreignKey({
+      name: 'users_supplier_same_shop_fk',
+      columns: [t.supplierId, t.shopId],
+      foreignColumns: [suppliers.id, suppliers.shopId],
+    }),
+    // ::text so the check doesn't use the new enum value in the migration that adds it.
+    check('users_supplier_role', sql`(${t.role}::text = 'supplier') = (${t.supplierId} is not null)`),
+  ],
 );
 
 export const customers = pgTable(
@@ -217,6 +235,58 @@ export const ledgerEntries = pgTable(
   ],
 );
 
+/**
+ * Deliveries a supplier records themselves. They don't count until the seller
+ * approves the litres: approval posts a `delivery` to the ledger (and links
+ * it here); a rejection sends it back with a reason. Separation of duties:
+ * the person who delivers never confirms their own delivery.
+ */
+export const deliverySubmissions = pgTable(
+  'delivery_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    supplierId: uuid('supplier_id').notNull(),
+    /** Nairobi day of the delivery, set by the server when it is recorded. */
+    businessDate: date('business_date').notNull(),
+    volumeMl: millilitres('volume_ml').notNull(),
+    note: text('note'),
+    status: deliverySubmissionStatusEnum('status').notNull().default('pending'),
+    submittedBy: uuid('submitted_by')
+      .notNull()
+      .references(() => users.id),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+    reviewedBy: uuid('reviewed_by').references(() => users.id),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    /** Why it was rejected (required), or an optional note on approval. */
+    reviewNote: text('review_note'),
+    /** The ledger delivery created on approval. */
+    ledgerEntryId: uuid('ledger_entry_id').unique(),
+  },
+  (t) => [
+    index('delivery_submissions_shop_status_idx').on(t.shopId, t.status),
+    index('delivery_submissions_shop_date_idx').on(t.shopId, t.businessDate),
+    index('delivery_submissions_supplier_idx').on(t.supplierId),
+    foreignKey({
+      name: 'delivery_submissions_supplier_same_shop_fk',
+      columns: [t.supplierId, t.shopId],
+      foreignColumns: [suppliers.id, suppliers.shopId],
+    }),
+    foreignKey({
+      name: 'delivery_submissions_ledger_same_shop_fk',
+      columns: [t.ledgerEntryId, t.shopId],
+      foreignColumns: [ledgerEntries.id, ledgerEntries.shopId],
+    }),
+    check('delivery_submissions_positive', sql`${t.volumeMl} > 0`),
+    check(
+      'delivery_submissions_review_consistent',
+      sql`(${t.status} = 'pending' and ${t.reviewedAt} is null and ${t.ledgerEntryId} is null)
+        or (${t.status} = 'approved' and ${t.reviewedAt} is not null and ${t.ledgerEntryId} is not null)
+        or (${t.status} = 'rejected' and ${t.reviewedAt} is not null and ${t.ledgerEntryId} is null and ${t.reviewNote} is not null)`,
+    ),
+  ],
+);
+
 /** Who did what, when. Written in the same transaction as the change. */
 export const auditLog = pgTable(
   'audit_log',
@@ -276,6 +346,8 @@ export type Role = (typeof roleEnum.enumValues)[number];
 export type Customer = typeof customers.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
+export type DeliverySubmission = typeof deliverySubmissions.$inferSelect;
+export type DeliverySubmissionStatus = (typeof deliverySubmissionStatusEnum.enumValues)[number];
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
 export type AuthTokenPurpose = (typeof authTokenPurposeEnum.enumValues)[number];

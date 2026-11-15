@@ -47,8 +47,7 @@ export function defineAction<S extends z.ZodType, T>(
   };
 }
 
-export const ANY_ROLE: Role[] = ['owner', 'attendant'];
-export const OWNER: Role[] = ['owner'];
+export { ALL_ROLES, OWNER, STAFF, SUPPLIER } from '@/lib/roles';
 
 /**
  * For signed-out flows (sign-up, codes, password reset): validation and error

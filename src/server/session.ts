@@ -2,6 +2,7 @@ import 'server-only';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import type { Role } from '@/db/schema';
+import { STAFF, homeFor } from '@/lib/roles';
 import type { Actor } from './ledger';
 
 export interface SessionUser {
@@ -26,11 +27,15 @@ export async function currentUser(): Promise<SessionUser | null> {
   };
 }
 
-/** For pages: redirect to /login (or home, if the role is wrong). */
-export async function requireUser(roles?: Role[]): Promise<SessionUser> {
+/**
+ * For pages: redirect to /login, or to the role's own home if this page
+ * isn't for it. Defaults to shop staff, so a supplier login can never open
+ * a shop page by accident; supplier pages pass `SUPPLIER` explicitly.
+ */
+export async function requireUser(roles: Role[] = STAFF): Promise<SessionUser> {
   const user = await currentUser();
   if (!user) redirect('/login');
-  if (roles && !roles.includes(user.role)) redirect('/');
+  if (!roles.includes(user.role)) redirect(homeFor(user.role));
   return user;
 }
 

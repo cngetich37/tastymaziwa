@@ -14,7 +14,7 @@ import { RecordDialog } from './record-dialog';
 /** Slim top bar on phones: which shop you're in, and your account. */
 export function MobileHeader({ user, shopName }: { user: ShellUser; shopName: string }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur md:hidden">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur md:hidden print:hidden">
       <Link href="/" className="flex min-w-0 items-center gap-2">
         <Logo />
         <span className="truncate text-lg font-bold tracking-tight">{shopName}</span>
@@ -57,7 +57,7 @@ export function MobileTabBar({ user, shopName }: { user: ShellUser; shopName: st
   return (
     <nav
       aria-label="Quick"
-      className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden print:hidden"
     >
       <ul className="grid grid-cols-5 items-end">
         <Tab item={TODAY} pathname={pathname} />

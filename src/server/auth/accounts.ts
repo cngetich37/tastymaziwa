@@ -11,8 +11,8 @@
  */
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { DB } from '@/db/client';
-import { auditLog, authTokens, shops, users, type Role } from '@/db/schema';
-import type { InviteStaffInput, SignupInput } from '@/lib/validation';
+import { auditLog, authTokens, shops, suppliers, users, type Role } from '@/db/schema';
+import type { InviteStaffInput, InviteSupplierInput, SignupInput } from '@/lib/validation';
 import { DomainError, type Actor } from '../ledger';
 import { dummyVerify, hashPassword, verifyPassword } from '../password';
 import { appUrl, authConfig } from './config';
@@ -326,14 +326,47 @@ export async function renameShop(db: DB, actor: Actor, name: string): Promise<vo
 }
 
 /** Adds a staff member and emails them a link to set a password. */
-export async function inviteStaff(db: DB, actor: Actor, input: InviteStaffInput) {
+export function inviteStaff(db: DB, actor: Actor, input: InviteStaffInput) {
+  return invite(db, actor, { name: input.name, email: input.email, role: input.role, supplierId: null });
+}
+
+/**
+ * Gives a supplier (milkman) their own login. They can only record their
+ * deliveries, which the seller then approves. One login per supplier.
+ */
+export async function inviteSupplier(db: DB, actor: Actor, input: InviteSupplierInput) {
+  const [supplier] = await db
+    .select({ id: suppliers.id, archivedAt: suppliers.archivedAt })
+    .from(suppliers)
+    .where(and(eq(suppliers.id, input.supplierId), eq(suppliers.shopId, actor.shopId)));
+  if (!supplier) throw new DomainError('Supplier not found');
+  if (supplier.archivedAt) throw new DomainError('That supplier has been archived');
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.supplierId, supplier.id), eq(users.shopId, actor.shopId)));
+  if (existing) throw new DomainError('This supplier already has a login. Manage it in Settings.');
+  return invite(db, actor, { name: input.name, email: input.email, role: 'supplier', supplierId: supplier.id });
+}
+
+async function invite(
+  db: DB,
+  actor: Actor,
+  input: { name: string; email: string; role: Role; supplierId: string | null },
+) {
   const token = generateLinkToken();
   const { user, shopName, inviterName } = await db.transaction(async (tx) => {
     const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, input.email));
     if (existing) throw new DomainError('That email already has a TastyMaziwa account');
     const [user] = await tx
       .insert(users)
-      .values({ shopId: actor.shopId, name: input.name, email: input.email, role: input.role })
+      .values({
+        shopId: actor.shopId,
+        name: input.name,
+        email: input.email,
+        role: input.role,
+        supplierId: input.supplierId,
+      })
       .returning({ id: users.id, email: users.email });
     await issueToken(tx, {
       purpose: 'password_reset',
@@ -349,7 +382,7 @@ export async function inviteStaff(db: DB, actor: Actor, input: InviteStaffInput)
       action: 'user.invite',
       entityType: 'user',
       entityId: user.id,
-      data: { email: input.email, role: input.role },
+      data: { email: input.email, role: input.role, supplierId: input.supplierId },
     });
     const [shop] = await tx.select({ name: shops.name }).from(shops).where(eq(shops.id, actor.shopId));
     const [inviter] = await tx.select({ name: users.name }).from(users).where(eq(users.id, actor.id!));
@@ -373,6 +406,9 @@ export async function setUserRole(db: DB, actor: Actor, userId: string, role: Ro
       .from(users)
       .where(and(eq(users.id, userId), eq(users.shopId, actor.shopId)));
     if (!target) throw new DomainError('User not found');
+    if (target.role === 'supplier' || role === 'supplier') {
+      throw new DomainError("A supplier's login can't be switched to a shop role");
+    }
     if (target.role === role) return;
     await tx.update(users).set({ role }).where(eq(users.id, userId));
     await tx.insert(auditLog).values({

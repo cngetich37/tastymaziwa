@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Banknote, CheckCircle2, Circle, Droplet, HandCoins, Lock, TrendingUp, Truck } from 'lucide-react';
 import { EntryList } from '@/components/entry-list';
 import { PageHeader } from '@/components/page-header';
+import { PendingDeliveriesCard } from '@/components/pending-deliveries-card';
 import { ProfitChart } from '@/components/profit-chart';
 import { QuickActions } from '@/components/quick-actions';
 import { StatCard } from '@/components/stat-card';
@@ -11,7 +12,7 @@ import { getDb } from '@/db';
 import { formatLongDate } from '@/lib/dates';
 import { formatKES, formatLitres } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { getDashboard, getShop, listEntries, listSuppliers } from '@/server/queries';
+import { getDashboard, getShop, listDeliverySubmissions, listEntries, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
 const salesDetail = (t: { salesMl: number; cashSalesCents: number; mpesaSalesCents: number; creditSalesCents: number }) =>
@@ -24,7 +25,7 @@ function SetupChecklist({ steps }: { steps: { done: boolean; label: string; href
     <Card className="border-amber-500/40 bg-amber-500/5">
       <CardHeader>
         <CardTitle>Get your shop ready</CardTitle>
-        <CardDescription>Attendants record litres only, at the prices you set here.</CardDescription>
+        <CardDescription>Sellers and suppliers record litres only, at the prices you set here.</CardDescription>
       </CardHeader>
       <CardContent>
         <ol className="grid gap-1">
@@ -57,7 +58,11 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const isOwner = user.role === 'owner';
   const db = await getDb();
-  const [dash, shop] = await Promise.all([getDashboard(db, user.shopId), getShop(db, user.shopId)]);
+  const [dash, shop, pending] = await Promise.all([
+    getDashboard(db, user.shopId),
+    getShop(db, user.shopId),
+    listDeliverySubmissions(db, user.shopId, { status: 'pending' }),
+  ]);
   const t = dash.todaySummary;
   const price = shop?.salePricePerLitreCents ?? null;
 
@@ -67,6 +72,7 @@ export default async function DashboardPage() {
     return (
       <div className="grid grid-cols-1 gap-6">
         <PageHeader title="Today" description={formatLongDate(dash.today)} />
+        <PendingDeliveriesCard deliveries={pending} today={dash.today} />
         <QuickActions />
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Lock className="size-4" aria-hidden />
@@ -131,6 +137,8 @@ export default async function DashboardPage() {
           },
         ]}
       />
+
+      <PendingDeliveriesCard deliveries={pending} today={dash.today} />
 
       <QuickActions />
 

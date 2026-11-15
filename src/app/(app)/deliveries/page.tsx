@@ -2,6 +2,7 @@ import { Droplet, Droplets, Plus, Truck, Wallet } from 'lucide-react';
 import { DayNav } from '@/components/day-nav';
 import { EntryList } from '@/components/entry-list';
 import { PageHeader } from '@/components/page-header';
+import { PendingDeliveriesCard } from '@/components/pending-deliveries-card';
 import { RecordDialog } from '@/components/shell/record-dialog';
 import { StatCard } from '@/components/stat-card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import {
   getDaySummary,
   getDeliveriesBySupplier,
   getStockOnHandMl,
+  listDeliverySubmissions,
   listEntries,
   type LedgerListItem,
 } from '@/server/queries';
@@ -30,12 +32,15 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
   const date = isOwner ? parseDateParam((await searchParams).date, today) : today;
   const dateDefault = { date: date === today ? undefined : date };
   const db = await getDb();
-  const [day, entries, bySupplier, stockMl] = await Promise.all([
+  const [day, entries, bySupplier, stockMl, pending, decided] = await Promise.all([
     getDaySummary(db, user.shopId, date),
     listEntries(db, user.shopId, { kinds: isOwner ? ['delivery', 'spoilage'] : ['delivery'], date, limit: 500 }),
     getDeliveriesBySupplier(db, user.shopId, date),
     getStockOnHandMl(db, user.shopId),
+    listDeliverySubmissions(db, user.shopId, { status: 'pending' }),
+    listDeliverySubmissions(db, user.shopId, { from: date, to: date }),
   ]);
+  const rejected = decided.filter((s) => s.status === 'rejected');
   const deliveries = entries.filter((e) => e.kind === 'delivery');
   const spoilage = entries.filter((e) => e.kind === 'spoilage');
   const runs = [
@@ -74,6 +79,8 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
         }
       />
       {isOwner && <DayNav date={date} today={today} basePath="/deliveries" />}
+
+      <PendingDeliveriesCard deliveries={pending} today={today} />
 
       <section aria-label="Delivery figures" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Milk received" value={formatLitres(day.deliveredMl)} icon={Truck} />
@@ -136,6 +143,29 @@ export default async function DeliveriesPage({ searchParams }: { searchParams: P
               )}
             </CardContent>
           </Card>
+          {rejected.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Rejected</CardTitle>
+                <CardDescription>Sent back to the supplier; not counted as received.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-y">
+                  {rejected.map((r) => (
+                    <li key={r.id} className="py-2 text-sm">
+                      <p className="flex justify-between gap-3">
+                        <span className="truncate font-medium">{r.supplierName}</span>
+                        <span className="tabular-nums line-through">{formatLitres(r.volumeMl)}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {r.reviewNote} · {r.reviewedByName}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
           {isOwner && (
             <Card>
               <CardHeader>
