@@ -51,18 +51,20 @@ export const actionsFor = (isOwner: boolean) => ENTRY_ACTIONS.filter((a) => !a.o
 export interface EntryDefaults {
   customerId?: string;
   supplierId?: string;
+  productId?: string;
   /** A past day, when an owner records from that day's page. */
   date?: BusinessDate;
 }
 
 function EntryForm({ kind, defaults, onDone }: { kind: EntryKind; defaults: EntryDefaults; onDone: () => void }) {
-  const { customers, suppliers, salePriceCents, isOwner } = useEntryData();
-  const { customerId, supplierId, date } = defaults;
+  const { customers, suppliers, products, salePriceCents, isOwner } = useEntryData();
+  const { customerId, supplierId, productId, date } = defaults;
   switch (kind) {
     case 'sale':
       return (
         <SaleForm
           customers={customers}
+          products={products}
           salePriceCents={salePriceCents}
           canEditPrice={isOwner}
           defaultCustomerId={customerId}
@@ -72,12 +74,19 @@ function EntryForm({ kind, defaults, onDone }: { kind: EntryKind; defaults: Entr
       );
     case 'delivery':
       return (
-        <DeliveryForm suppliers={suppliers} canEditPrice={isOwner} defaultSupplierId={supplierId} date={date} onDone={onDone} />
+        <DeliveryForm
+          suppliers={suppliers}
+          products={products}
+          canEditPrice={isOwner}
+          defaultSupplierId={supplierId}
+          date={date}
+          onDone={onDone}
+        />
       );
     case 'payment':
       return <CustomerPaymentForm customers={customers} defaultCustomerId={customerId} date={date} onDone={onDone} />;
     case 'spoilage':
-      return <SpoilageForm date={date} onDone={onDone} />;
+      return <SpoilageForm date={date} products={products} defaultProductId={productId} onDone={onDone} />;
     case 'supplier':
       return <SupplierPaymentForm suppliers={suppliers} defaultSupplierId={supplierId} date={date} onDone={onDone} />;
     case 'expense':

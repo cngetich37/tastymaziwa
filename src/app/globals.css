@@ -16,8 +16,8 @@
 }
 
 @theme {
-  --font-body: var(--font-pt-sans), system-ui, sans-serif;
-  --font-headline: var(--font-pt-sans), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-headline: var(--font-inter), system-ui, sans-serif;
   --font-code: monospace;
 
   --color-border: hsl(var(--border));
@@ -109,81 +109,78 @@
 }
 
 @layer base {
+  /*
+    A calm, neutral ERP palette: grey canvas, white surfaces, one emerald
+    brand colour. Text on primary meets WCAG AA in both themes.
+  */
   :root {
-    --background: 210 40% 98%; /* Refreshing light blue tinted background */
+    --background: 220 20% 97%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    
-    /* Primary: Vibrant modern green */
-    --primary: 142 71% 45%; 
-    --primary-foreground: 144 100% 98%;
-    
-    /* Secondary: Soft creamy white */
-    --secondary: 210 40% 96%;
+
+    --primary: 161 84% 26%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 94%;
     --secondary-foreground: 222 47% 11%;
-    
-    /* Muted and accents */
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
-    
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 142 71% 45%;
-    
-    --radius: 0.75rem;
+    --muted: 220 14% 95%;
+    --muted-foreground: 220 9% 40%;
 
-    /* Chart colors: vibrant and distinct */
-    --chart-1: 142 71% 45%;
-    --chart-2: 30 80% 55%;
-    --chart-3: 200 80% 50%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --accent: 161 50% 95%;
+    --accent-foreground: 161 84% 20%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 89%;
+    --input: 220 13% 85%;
+    --ring: 161 84% 32%;
+
+    --radius: 0.625rem;
+
+    --chart-1: 161 84% 32%;
+    --chart-2: 32 90% 50%;
+    --chart-3: 210 80% 50%;
+    --chart-4: 270 60% 58%;
+    --chart-5: 345 75% 52%;
   }
 
   .dark {
-    /* Deep sleek slate background instead of pure black */
-    --background: 222 47% 7%; 
-    --foreground: 210 40% 98%;
-    /* Cards slightly elevated from background */
-    --card: 222 47% 10%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 98%;
-    
-    /* Primary: Vibrant green */
-    --primary: 142 70% 50%;
-    --primary-foreground: 144 100% 10%;
-    
-    --secondary: 217 32% 17%;
-    --secondary-foreground: 210 40% 98%;
-    
-    --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
-    
-    --accent: 217 32% 17%;
-    --accent-foreground: 210 40% 98%;
-    
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --background: 222 30% 7%;
+    --foreground: 210 30% 96%;
+    --card: 222 28% 10%;
+    --card-foreground: 210 30% 96%;
+    --popover: 222 28% 11%;
+    --popover-foreground: 210 30% 96%;
 
-    --border: 217 32% 17%;
-    --input: 217 32% 17%;
-    --ring: 142 70% 50%;
+    --primary: 158 64% 52%;
+    --primary-foreground: 165 90% 8%;
 
-    --chart-1: 142 70% 50%;
-    --chart-2: 30 80% 55%;
-    --chart-3: 200 80% 50%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --secondary: 220 20% 16%;
+    --secondary-foreground: 210 30% 96%;
+
+    --muted: 220 20% 15%;
+    --muted-foreground: 218 14% 68%;
+
+    --accent: 160 40% 14%;
+    --accent-foreground: 158 64% 70%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 18% 18%;
+    --input: 220 18% 24%;
+    --ring: 158 64% 52%;
+
+    --chart-1: 158 64% 52%;
+    --chart-2: 32 90% 58%;
+    --chart-3: 210 85% 62%;
+    --chart-4: 270 70% 70%;
+    --chart-5: 345 80% 64%;
   }
 }
 
@@ -193,5 +190,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Money and litres line up in columns. */
+    font-variant-numeric: tabular-nums;
   }
 }

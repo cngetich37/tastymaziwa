@@ -78,9 +78,17 @@ export function TextField({
   placeholder,
   autoFocus,
   presets,
-}: BaseProps & { kind?: InputKind; placeholder?: string; autoFocus?: boolean; presets?: Preset[] }) {
+  suffix: suffixOverride,
+}: BaseProps & {
+  kind?: InputKind;
+  placeholder?: string;
+  autoFocus?: boolean;
+  presets?: Preset[];
+  /** Replaces the kind's unit suffix, e.g. "pcs" or "kg" for products. */
+  suffix?: string;
+}) {
   const { control, setValue } = useFormContext();
-  const suffix = suffixes[kind];
+  const suffix = suffixOverride ?? suffixes[kind];
   return (
     <FormField
       control={control}
@@ -171,7 +179,12 @@ export function SelectField({
 }
 
 /** Large tap-target segmented choice (e.g. Cash / M-Pesa / Credit). */
-export function ChoiceField({ name, label, options }: BaseProps & { options: Option[] }) {
+export function ChoiceField({
+  name,
+  label,
+  options,
+  wrap = false,
+}: BaseProps & { options: Option[]; /** Many options: wrap onto lines instead of one row. */ wrap?: boolean }) {
   const { control } = useFormContext();
   return (
     <FormField
@@ -180,7 +193,11 @@ export function ChoiceField({ name, label, options }: BaseProps & { options: Opt
       render={({ field }) => (
         <FormItem>
           <FormLabel>{label}</FormLabel>
-          <div role="radiogroup" aria-label={label} className="grid auto-cols-fr grid-flow-col gap-2">
+          <div
+            role="radiogroup"
+            aria-label={label}
+            className={cn(wrap ? 'flex flex-wrap gap-2' : 'grid auto-cols-fr grid-flow-col gap-2')}
+          >
             {options.map((o) => {
               const selected = field.value === o.value;
               return (
@@ -193,6 +210,7 @@ export function ChoiceField({ name, label, options }: BaseProps & { options: Opt
                   className={cn(
                     'flex min-h-11 items-center justify-center gap-2 rounded-lg border px-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                     o.icon && 'min-h-14 flex-col gap-1',
+                    wrap && 'px-4',
                     selected
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-input bg-background hover:bg-muted',

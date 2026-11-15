@@ -1,14 +1,13 @@
 import type { Metadata, Viewport } from 'next';
-import { PT_Sans } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 
 // Self-hosted at build time: no request to Google on the shop's data bundle.
-const ptSans = PT_Sans({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '700'],
-  variable: '--font-pt-sans',
+  variable: '--font-inter',
   display: 'swap',
 });
 
@@ -23,14 +22,14 @@ export const viewport: Viewport = {
   // Android: the keyboard shrinks the layout, so bottom sheets and the Save button stay above it.
   interactiveWidget: 'resizes-content',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b0f19' },
+    { media: '(prefers-color-scheme: light)', color: '#f6f7f9' },
+    { media: '(prefers-color-scheme: dark)', color: '#0d111a' },
   ],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en-KE" className={ptSans.variable} suppressHydrationWarning>
+    <html lang="en-KE" className={inter.variable} suppressHydrationWarning>
       <body className="font-body antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}

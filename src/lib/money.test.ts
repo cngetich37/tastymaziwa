@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   centsToKesString,
+  formatQuantity,
   formatKES,
   formatLitres,
   kesToCents,
@@ -63,5 +64,14 @@ describe('formatting', () => {
     expect(centsToKesString(7050)).toBe('70.50');
     expect(centsToKesString(-5)).toBe('-0.05');
     expect(kesToCents(centsToKesString(123456))).toBe(123456);
+  });
+});
+
+describe('formatQuantity', () => {
+  it('formats thousandths in the product unit', () => {
+    expect(formatQuantity(2500)).toBe('2.5 L');
+    expect(formatQuantity(1000, 'piece')).toBe('1 pc');
+    expect(formatQuantity(3000, 'piece')).toBe('3 pcs');
+    expect(formatQuantity(250, 'kg')).toBe('0.25 kg');
   });
 });

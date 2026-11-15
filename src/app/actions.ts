@@ -18,6 +18,9 @@ import {
   expenseSchema,
   inviteStaffSchema,
   inviteSupplierSchema,
+  archiveProductSchema,
+  productSchema,
+  updateProductSchema,
   reviewDeliverySchema,
   submitDeliverySchema,
   profileSchema,
@@ -131,6 +134,22 @@ export const setSubscriptionStatusAction = defineAction(
   { schema: subscriptionStatusSchema, roles: OWNER },
   ({ db, actor }, input) =>
     ledger.setSubscriptionStatus(db, actor, input.subscriptionId, input.status).then(idOnly),
+);
+
+// --- products (owner) ------------------------------------------------------------
+
+export const createProductAction = defineAction({ schema: productSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.createProduct(db, actor, input).then(idOnly),
+);
+
+export const updateProductAction = defineAction(
+  { schema: updateProductSchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.updateProduct(db, actor, input).then(idOnly),
+);
+
+export const archiveProductAction = defineAction(
+  { schema: archiveProductSchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.setProductArchived(db, actor, input.productId, input.archived).then(idOnly),
 );
 
 // --- your account (every role, suppliers included) --------------------------------------------------

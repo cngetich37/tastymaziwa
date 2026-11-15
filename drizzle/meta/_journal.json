@@ -43,6 +43,13 @@
       "when": 1794720992760,
       "tag": "0005_supplier_deliveries",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794723828412,
+      "tag": "0006_products",
+      "breakpoints": true
     }
   ]
 }

@@ -68,3 +68,16 @@ const litreFormatter = new Intl.NumberFormat('en-KE', { maximumFractionDigits: 3
 export function formatLitres(ml: number): string {
   return `${litreFormatter.format(ml / 1000)} L`;
 }
+
+export type QuantityUnit = 'litre' | 'piece' | 'kg';
+
+const UNIT_SUFFIX: Record<QuantityUnit, (n: string, one: boolean) => string> = {
+  litre: (n) => `${n} L`,
+  kg: (n) => `${n} kg`,
+  piece: (n, one) => `${n} ${one ? 'pc' : 'pcs'}`,
+};
+
+/** Thousandths of a unit → "2.5 L", "3 pcs", "0.25 kg". Milk (no unit) is litres. */
+export function formatQuantity(milli: number, unit: QuantityUnit = 'litre'): string {
+  return UNIT_SUFFIX[unit](litreFormatter.format(milli / 1000), Math.abs(milli) === 1000);
+}

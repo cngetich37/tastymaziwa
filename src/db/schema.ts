@@ -37,6 +37,9 @@ export const entryKindEnum = pgEnum('entry_kind', [
 
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'mpesa', 'credit']);
 
+/** How a product is counted. Quantities are stored in thousandths: ml, milli-pieces, grams. */
+export const productUnitEnum = pgEnum('product_unit', ['litre', 'piece', 'kg']);
+
 export const deliverySubmissionStatusEnum = pgEnum('delivery_submission_status', [
   'pending', // recorded by the supplier, waiting for the seller
   'approved', // the seller confirmed the litres; posted to the ledger
@@ -134,6 +137,37 @@ export const suppliers = pgTable(
   (t) => [unique('suppliers_id_shop_unique').on(t.id, t.shopId), index('suppliers_shop_idx').on(t.shopId)],
 );
 
+/**
+ * What the shop sells besides fresh milk (mala, yoghurt, ghee, packets…).
+ * Fresh milk itself is not a row: a ledger entry with no product is milk,
+ * priced by `shops.sale_price_per_litre_cents` and each supplier's price.
+ */
+export const products = pgTable(
+  'products',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    name: text('name').notNull(),
+    unit: productUnitEnum('unit').notNull().default('piece'),
+    /** Per unit (per litre, per piece, per kg). Sellers always sell at this price. */
+    salePriceCents: cents('sale_price_cents'),
+    /** Usual buying price per unit; pre-fills stock purchases. */
+    costPriceCents: cents('cost_price_cents'),
+    /** Warn when stock falls to this many thousandths of a unit or below. */
+    reorderLevel: millilitres('reorder_level'),
+    createdAt: createdAt(),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+  },
+  (t) => [
+    unique('products_id_shop_unique').on(t.id, t.shopId),
+    index('products_shop_idx').on(t.shopId),
+    check(
+      'products_non_negative',
+      sql`coalesce(${t.salePriceCents}, 0) >= 0 and coalesce(${t.costPriceCents}, 0) >= 0 and coalesce(${t.reorderLevel}, 0) >= 0`,
+    ),
+  ],
+);
+
 export const subscriptions = pgTable(
   'subscriptions',
   {
@@ -175,6 +209,8 @@ export const ledgerEntries = pgTable(
     amountCents: cents('amount_cents').notNull().default(0),
     unitPriceCents: cents('unit_price_cents'),
     paymentMethod: paymentMethodEnum('payment_method'),
+    /** Null = fresh milk. Otherwise `volume_ml` is thousandths of the product's unit. */
+    productId: uuid('product_id'),
     customerId: uuid('customer_id'),
     supplierId: uuid('supplier_id'),
     subscriptionId: uuid('subscription_id'),
@@ -193,6 +229,12 @@ export const ledgerEntries = pgTable(
     index('ledger_shop_date_idx').on(t.shopId, t.businessDate),
     index('ledger_customer_idx').on(t.customerId),
     index('ledger_supplier_idx').on(t.supplierId),
+    index('ledger_shop_product_idx').on(t.shopId, t.productId),
+    foreignKey({
+      name: 'ledger_product_same_shop_fk',
+      columns: [t.productId, t.shopId],
+      foreignColumns: [products.id, products.shopId],
+    }),
     // Composite keys: a referenced row must belong to the same shop. NULL
     // columns skip the check (MATCH SIMPLE), so optional references still work.
     foreignKey({
@@ -345,6 +387,8 @@ export type User = typeof users.$inferSelect;
 export type Role = (typeof roleEnum.enumValues)[number];
 export type Customer = typeof customers.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
+export type Product = typeof products.$inferSelect;
+export type ProductUnit = (typeof productUnitEnum.enumValues)[number];
 export type Subscription = typeof subscriptions.$inferSelect;
 export type DeliverySubmission = typeof deliverySubmissions.$inferSelect;
 export type DeliverySubmissionStatus = (typeof deliverySubmissionStatusEnum.enumValues)[number];

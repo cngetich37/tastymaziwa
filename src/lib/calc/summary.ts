@@ -22,10 +22,19 @@ export interface LedgerRow {
   paymentMethod: PaymentMethod | null;
   amountCents: number;
   volumeMl: number;
+  /**
+   * Null or absent = fresh milk. Other products count towards money but not
+   * towards litres or milk stock (their quantities are pieces, kg…).
+   */
+  productId?: string | null;
 }
 
+const isMilk = (row: LedgerRow) => row.productId == null;
+
 export interface Summary {
+  /** All products, milk included. */
   salesCents: number;
+  /** Milk litres only (in ml); see `LedgerRow.productId`. */
   salesMl: number;
   cashSalesCents: number;
   mpesaSalesCents: number;
@@ -42,7 +51,7 @@ export interface Summary {
   grossProfitCents: number;
   /** Gross profit minus operating expenses. */
   netProfitCents: number;
-  /** Litres that should be left: delivered − sold − spoiled (may be negative if data is incomplete). */
+  /** Milk that should be left: delivered − sold − spoiled (may be negative if data is incomplete). */
   stockChangeMl: number;
 }
 
@@ -73,17 +82,17 @@ export function summarize(rows: Iterable<LedgerRow>): Summary {
     switch (row.kind) {
       case 'sale':
         s.salesCents += row.amountCents;
-        s.salesMl += row.volumeMl;
+        if (isMilk(row)) s.salesMl += row.volumeMl;
         if (row.paymentMethod === 'cash') s.cashSalesCents += row.amountCents;
         else if (row.paymentMethod === 'mpesa') s.mpesaSalesCents += row.amountCents;
         else if (row.paymentMethod === 'credit') s.creditSalesCents += row.amountCents;
         break;
       case 'delivery':
         s.deliveryCostCents += row.amountCents;
-        s.deliveredMl += row.volumeMl;
+        if (isMilk(row)) s.deliveredMl += row.volumeMl;
         break;
       case 'spoilage':
-        s.spoiledMl += row.volumeMl;
+        if (isMilk(row)) s.spoiledMl += row.volumeMl;
         break;
       case 'expense':
         s.expensesCents += row.amountCents;

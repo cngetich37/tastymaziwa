@@ -10,6 +10,7 @@ import {
   customers,
   deliverySubmissions,
   ledgerEntries,
+  products,
   shops,
   subscriptions,
   suppliers,
@@ -23,6 +24,8 @@ import { lineTotalCents } from '@/lib/money';
 import type {
   CustomerInput,
   CustomerPaymentInput,
+  ProductInput,
+  UpdateProductInput,
   DeliveryInput,
   ExpenseInput,
   ReviewDeliveryInput,
@@ -140,6 +143,16 @@ async function shopSalePrice(tx: Tx, actor: Actor): Promise<number | null> {
   return row?.price ?? null;
 }
 
+async function assertProduct(tx: Tx, actor: Actor, productId: string) {
+  const [row] = await tx
+    .select()
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.shopId, actor.shopId)));
+  if (!row) throw new DomainError('Product not found');
+  if (row.archivedAt) throw new DomainError(`${row.name} is no longer sold`);
+  return row;
+}
+
 /**
  * The price an entry is recorded at. A manager may type a different price
  * for one entry; anyone else always gets the price on file.
@@ -164,14 +177,21 @@ export function recordSale(db: DB, actor: Actor, input: SaleInput) {
   return db.transaction(async (tx) => {
     const businessDate = entryDateFor(actor, input.date);
     if (input.customerId) await assertCustomer(tx, actor, input.customerId);
-    const price = resolvePrice(actor, input.pricePerLitre, await shopSalePrice(tx, actor), {
-      manager: 'Set your selling price in Settings first, or type a price',
-      staff: 'The owner has not set a selling price yet',
-    });
+    const product = input.productId ? await assertProduct(tx, actor, input.productId) : null;
+    const price = product
+      ? resolvePrice(actor, input.pricePerLitre, product.salePriceCents, {
+          manager: `Set ${product.name}'s selling price first, or type a price`,
+          staff: `The owner has not set ${product.name}'s price yet`,
+        })
+      : resolvePrice(actor, input.pricePerLitre, await shopSalePrice(tx, actor), {
+          manager: 'Set your selling price in Settings first, or type a price',
+          staff: 'The owner has not set a selling price yet',
+        });
     const isCredit = input.paymentMethod === 'credit';
     return insertEntry(tx, actor, {
       kind: 'sale',
       businessDate,
+      productId: product?.id ?? null,
       volumeMl: input.litres,
       unitPriceCents: price,
       amountCents: lineTotalCents(input.litres, price),
@@ -210,6 +230,23 @@ export function recordDelivery(db: DB, actor: Actor, input: DeliveryInput) {
     if (actor.role === 'supplier') throw new DomainError('Record your delivery from your own page');
     const businessDate = entryDateFor(actor, input.date);
     const supplier = await assertSupplier(tx, actor, input.supplierId);
+    if (input.productId) {
+      // Buying stock other than milk is the owner's job, at the price they type or the usual cost.
+      if (!isManager(actor)) throw new DomainError('Only the owner can record stock purchases');
+      const product = await assertProduct(tx, actor, input.productId);
+      const price = input.pricePerLitre ?? product.costPriceCents;
+      if (price == null) throw new DomainError(`Type a buying price for ${product.name}`);
+      return insertEntry(tx, actor, {
+        kind: 'delivery',
+        businessDate,
+        productId: product.id,
+        volumeMl: input.litres,
+        unitPriceCents: price,
+        amountCents: lineTotalCents(input.litres, price),
+        supplierId: input.supplierId,
+        note: input.note,
+      });
+    }
     if (!isManager(actor) && (await supplierHasLogin(tx, actor, input.supplierId))) {
       throw new DomainError(
         `${supplier.name} records their own deliveries. Approve it under "Waiting for approval" instead.`,
@@ -366,15 +403,18 @@ export function recordExpense(db: DB, actor: Actor, input: ExpenseInput) {
 }
 
 export function recordSpoilage(db: DB, actor: Actor, input: SpoilageInput) {
-  return db.transaction((tx) =>
-    insertEntry(tx, actor, {
+  return db.transaction(async (tx) => {
+    const businessDate = entryDateFor(actor, input.date);
+    const product = input.productId ? await assertProduct(tx, actor, input.productId) : null;
+    return insertEntry(tx, actor, {
       kind: 'spoilage',
-      businessDate: entryDateFor(actor, input.date),
+      businessDate,
+      productId: product?.id ?? null,
       volumeMl: input.litres,
       expenseCategory: input.reason,
       note: input.note,
-    }),
-  );
+    });
+  });
 }
 
 /**
@@ -402,6 +442,7 @@ export function reverseEntry(db: DB, actor: Actor, entryId: string, reason: stri
       amountCents: -original.amountCents,
       unitPriceCents: original.unitPriceCents,
       paymentMethod: original.paymentMethod,
+      productId: original.productId,
       customerId: original.customerId,
       supplierId: original.supplierId,
       subscriptionId: original.subscriptionId,
@@ -594,5 +635,74 @@ export function setSalePrice(db: DB, actor: Actor, pricePerLitreCents: number) {
       from: previous,
       to: pricePerLitreCents,
     });
+  });
+}
+
+// --- products -------------------------------------------------------------------
+
+export function createProduct(db: DB, actor: Actor, input: ProductInput) {
+  return db.transaction(async (tx) => {
+    const [product] = await tx
+      .insert(products)
+      .values({
+        shopId: actor.shopId,
+        name: input.name,
+        unit: input.unit,
+        salePriceCents: input.salePrice ?? null,
+        costPriceCents: input.costPrice ?? null,
+        reorderLevel: input.reorderLevel ?? null,
+      })
+      .returning();
+    await audit(tx, actor, 'product.create', 'product', product.id, input);
+    return product;
+  });
+}
+
+/** Price changes apply to new entries only; the audit row keeps the old prices. */
+export function updateProduct(db: DB, actor: Actor, input: UpdateProductInput) {
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select()
+      .from(products)
+      .where(and(eq(products.id, input.productId), eq(products.shopId, actor.shopId)));
+    if (!before) throw new DomainError('Product not found');
+    if (before.unit !== input.unit) {
+      const [used] = await tx
+        .select({ id: ledgerEntries.id })
+        .from(ledgerEntries)
+        .where(and(eq(ledgerEntries.productId, before.id), eq(ledgerEntries.shopId, actor.shopId)))
+        .limit(1);
+      if (used) throw new DomainError("The unit can't change once the product has been bought or sold");
+    }
+    const [product] = await tx
+      .update(products)
+      .set({
+        name: input.name,
+        unit: input.unit,
+        salePriceCents: input.salePrice ?? null,
+        costPriceCents: input.costPrice ?? null,
+        reorderLevel: input.reorderLevel ?? null,
+      })
+      .where(and(eq(products.id, input.productId), eq(products.shopId, actor.shopId)))
+      .returning();
+    await audit(tx, actor, 'product.update', 'product', product.id, {
+      ...input,
+      previousSalePriceCents: before.salePriceCents,
+      previousCostPriceCents: before.costPriceCents,
+    });
+    return product;
+  });
+}
+
+export function setProductArchived(db: DB, actor: Actor, productId: string, archived: boolean) {
+  return db.transaction(async (tx) => {
+    const [product] = await tx
+      .update(products)
+      .set({ archivedAt: archived ? sql`now()` : null })
+      .where(and(eq(products.id, productId), eq(products.shopId, actor.shopId)))
+      .returning();
+    if (!product) throw new DomainError('Product not found');
+    await audit(tx, actor, archived ? 'product.archive' : 'product.restore', 'product', product.id);
+    return product;
   });
 }

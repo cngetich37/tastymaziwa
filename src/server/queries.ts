@@ -8,7 +8,17 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DB } from '@/db/client';
-import { customers, deliverySubmissions, ledgerEntries, shops, subscriptions, suppliers, users } from '@/db/schema';
+import {
+  customers,
+  deliverySubmissions,
+  ledgerEntries,
+  products,
+  shops,
+  subscriptions,
+  suppliers,
+  users,
+  type ProductUnit,
+} from '@/db/schema';
 import { allocatePayments, type AllocatedCreditSale } from '@/lib/calc/allocation';
 import { withRunningBalance } from '@/lib/calc/statement';
 import {
@@ -20,7 +30,7 @@ import {
   type LedgerRow,
   type Summary,
 } from '@/lib/calc/summary';
-import { daysBetween, lastNDates, todayBusinessDate, type BusinessDate } from '@/lib/dates';
+import { addDays, daysBetween, lastNDates, todayBusinessDate, type BusinessDate } from '@/lib/dates';
 
 const sumAmount = sql<number>`coalesce(sum(${ledgerEntries.amountCents}), 0)`.mapWith(Number);
 const sumVolume = sql<number>`coalesce(sum(${ledgerEntries.volumeMl}), 0)`.mapWith(Number);
@@ -31,12 +41,13 @@ async function aggregate(db: DB, shopId: string, where?: SQL): Promise<LedgerRow
     .select({
       kind: ledgerEntries.kind,
       paymentMethod: ledgerEntries.paymentMethod,
+      productId: ledgerEntries.productId,
       amountCents: sumAmount,
       volumeMl: sumVolume,
     })
     .from(ledgerEntries)
     .where(and(eq(ledgerEntries.shopId, shopId), where))
-    .groupBy(ledgerEntries.kind, ledgerEntries.paymentMethod);
+    .groupBy(ledgerEntries.kind, ledgerEntries.paymentMethod, ledgerEntries.productId);
 }
 
 // --- dashboard --------------------------------------------------------------
@@ -61,6 +72,7 @@ export async function getDashboard(db: DB, shopId: string, today = todayBusiness
         businessDate: ledgerEntries.businessDate,
         kind: ledgerEntries.kind,
         paymentMethod: ledgerEntries.paymentMethod,
+        productId: ledgerEntries.productId,
         amountCents: sumAmount,
         volumeMl: sumVolume,
       })
@@ -72,7 +84,7 @@ export async function getDashboard(db: DB, shopId: string, today = todayBusiness
           lte(ledgerEntries.businessDate, today),
         ),
       )
-      .groupBy(ledgerEntries.businessDate, ledgerEntries.kind, ledgerEntries.paymentMethod),
+      .groupBy(ledgerEntries.businessDate, ledgerEntries.kind, ledgerEntries.paymentMethod, ledgerEntries.productId),
     aggregate(db, shopId),
     db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
@@ -104,6 +116,9 @@ export interface LedgerListItem {
   amountCents: number;
   unitPriceCents: number | null;
   paymentMethod: LedgerRow['paymentMethod'];
+  /** Null = fresh milk (litres). */
+  productName: string | null;
+  productUnit: ProductUnit | null;
   customerName: string | null;
   supplierName: string | null;
   category: string | null;
@@ -142,6 +157,8 @@ export async function listEntries(
       amountCents: ledgerEntries.amountCents,
       unitPriceCents: ledgerEntries.unitPriceCents,
       paymentMethod: ledgerEntries.paymentMethod,
+      productName: products.name,
+      productUnit: products.unit,
       customerName: customers.name,
       supplierName: suppliers.name,
       category: ledgerEntries.expenseCategory,
@@ -153,6 +170,7 @@ export async function listEntries(
     .from(ledgerEntries)
     .leftJoin(customers, eq(customers.id, ledgerEntries.customerId))
     .leftJoin(suppliers, eq(suppliers.id, ledgerEntries.supplierId))
+    .leftJoin(products, eq(products.id, ledgerEntries.productId))
     .leftJoin(users, eq(users.id, ledgerEntries.createdBy))
     .leftJoin(reversal, eq(reversal.reversesId, ledgerEntries.id))
     .where(
@@ -360,7 +378,12 @@ export async function getDeliveriesBySupplier(db: DB, shopId: string, date: Busi
     .from(ledgerEntries)
     .innerJoin(suppliers, eq(suppliers.id, ledgerEntries.supplierId))
     .where(
-      and(eq(ledgerEntries.shopId, shopId), eq(ledgerEntries.kind, 'delivery'), eq(ledgerEntries.businessDate, date)),
+      and(
+        eq(ledgerEntries.shopId, shopId),
+        eq(ledgerEntries.kind, 'delivery'),
+        eq(ledgerEntries.businessDate, date),
+        isNull(ledgerEntries.productId),
+      ),
     )
     .groupBy(ledgerEntries.supplierId, suppliers.name)
     .orderBy(suppliers.name);
@@ -534,6 +557,95 @@ export async function getSupplierPortal(db: DB, shopId: string, userId: string) 
     shopName: shop?.name ?? 'TastyMaziwa',
     submissions,
   };
+}
+
+// --- products & stock ----------------------------------------------------------------
+
+export interface StockLevel {
+  /** Null = fresh milk. */
+  productId: string | null;
+  name: string;
+  unit: ProductUnit;
+  salePriceCents: number | null;
+  costPriceCents: number | null;
+  reorderLevel: number | null;
+  /** Thousandths of the unit: bought - sold - written off, all time. */
+  onHand: number;
+  /** Sold in the last 7 days, for "days of stock left". */
+  sold7d: number;
+  archived: boolean;
+  low: boolean;
+}
+
+const stockMovement = sql<number>`coalesce(sum(case
+  when ${ledgerEntries.kind} = 'delivery' then ${ledgerEntries.volumeMl}
+  when ${ledgerEntries.kind} in ('sale', 'spoilage') then -${ledgerEntries.volumeMl}
+  else 0 end), 0)`.mapWith(Number);
+
+/** Stock on hand for milk and every product, from the ledger. */
+export async function getStockLevels(
+  db: DB,
+  shopId: string,
+  { includeArchived = false, today = todayBusinessDate() } = {},
+): Promise<StockLevel[]> {
+  const weekAgo = addDays(today, -6);
+  const [rows, movement, shop] = await Promise.all([
+    db
+      .select()
+      .from(products)
+      .where(and(eq(products.shopId, shopId), includeArchived ? undefined : isNull(products.archivedAt)))
+      .orderBy(products.name),
+    db
+      .select({
+        productId: ledgerEntries.productId,
+        onHand: stockMovement,
+        sold7d: sql<number>`coalesce(sum(${ledgerEntries.volumeMl}) filter (where ${ledgerEntries.kind} = 'sale' and ${ledgerEntries.businessDate} >= ${weekAgo}), 0)`.mapWith(Number),
+      })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.shopId, shopId))
+      .groupBy(ledgerEntries.productId),
+    getShop(db, shopId),
+  ]);
+  const of = (id: string | null) => movement.find((m) => m.productId === id) ?? { onHand: 0, sold7d: 0 };
+  const milk = of(null);
+  const levels: StockLevel[] = [
+    {
+      productId: null,
+      name: 'Fresh milk',
+      unit: 'litre',
+      salePriceCents: shop?.salePricePerLitreCents ?? null,
+      costPriceCents: null,
+      reorderLevel: null,
+      onHand: milk.onHand,
+      sold7d: milk.sold7d,
+      archived: false,
+      low: milk.onHand < 0,
+    },
+  ];
+  for (const p of rows) {
+    const m = of(p.id);
+    levels.push({
+      productId: p.id,
+      name: p.name,
+      unit: p.unit,
+      salePriceCents: p.salePriceCents,
+      costPriceCents: p.costPriceCents,
+      reorderLevel: p.reorderLevel,
+      onHand: m.onHand,
+      sold7d: m.sold7d,
+      archived: p.archivedAt != null,
+      low: p.archivedAt == null && (m.onHand < 0 || (p.reorderLevel != null && m.onHand <= p.reorderLevel)),
+    });
+  }
+  return levels;
+}
+
+export async function getProduct(db: DB, shopId: string, productId: string) {
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.shopId, shopId)));
+  return product ?? null;
 }
 
 // --- shop ---------------------------------------------------------------------

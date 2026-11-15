@@ -5,6 +5,7 @@ import { Banknote, CalendarClock, Lock, NotebookPen, Smartphone } from 'lucide-r
 import { Form } from '@/components/ui/form';
 import {
   createCustomerAction,
+  createProductAction,
   createSubscriptionAction,
   createSupplierAction,
   inviteStaffAction,
@@ -19,10 +20,12 @@ import {
   setSalePriceAction,
   submitDeliveryAction,
   updateCustomerAction,
+  updateProductAction,
   updateSupplierAction,
 } from '@/app/actions';
+import type { ProductUnit } from '@/db/schema';
 import { formatLongDate, todayBusinessDate, type BusinessDate } from '@/lib/dates';
-import { centsToKesString, formatKES, kesToCents, lineTotalCents, litresToMl } from '@/lib/money';
+import { centsToKesString, formatKES, formatQuantity, kesToCents, lineTotalCents, litresToMl } from '@/lib/money';
 import {
   EXPENSE_CATEGORIES,
   SPOILAGE_REASONS,
@@ -32,6 +35,7 @@ import {
   expenseSchema,
   inviteStaffSchema,
   inviteSupplierSchema,
+  productSchema,
   reviewDeliverySchema,
   salePriceSchema,
   saleSchema,
@@ -41,6 +45,7 @@ import {
   supplierPaymentSchema,
   supplierSchema,
   updateCustomerSchema,
+  updateProductSchema,
   updateSupplierSchema,
 } from '@/lib/validation';
 import { ChoiceField, SelectField, SubmitButton, TextField, type Option, type Preset } from './fields';
@@ -64,6 +69,32 @@ export interface SupplierOption {
   /** Has their own login: records their deliveries, which the seller approves. */
   selfRecords: boolean;
 }
+
+/** A product other than milk, as the counter forms see it. */
+export interface ProductOption {
+  id: string;
+  name: string;
+  unit: ProductUnit;
+  salePriceCents: number | null;
+  /** Only sent to owners. */
+  costPriceCents: number | null;
+}
+
+const UNIT_WORD: Record<ProductUnit, string> = { litre: 'litre', piece: 'piece', kg: 'kg' };
+const UNIT_SUFFIX: Record<ProductUnit, string> = { litre: 'L', piece: 'pcs', kg: 'kg' };
+const PRESETS: Record<ProductUnit, string[]> = {
+  litre: ['0.5', '1', '2', '5'],
+  piece: ['1', '2', '3', '5'],
+  kg: ['0.25', '0.5', '1'],
+};
+const presetsFor = (unit: ProductUnit): Preset[] =>
+  PRESETS[unit].map((v) => ({ value: v, label: formatQuantity(Number(v) * 1000, unit).replace('0.5 L', '½ L') }));
+
+/** "Milk" plus each product, as one-tap chips. */
+const productChoices = (products: ProductOption[]): Option[] => [
+  { value: '', label: 'Milk' },
+  ...products.map((p) => ({ value: p.id, label: p.name })),
+];
 
 interface FormProps {
   onDone?: () => void;
@@ -163,6 +194,7 @@ function NoSuppliers() {
 
 export function SaleForm({
   customers,
+  products = [],
   salePriceCents,
   canEditPrice,
   defaultCustomerId,
@@ -171,6 +203,8 @@ export function SaleForm({
 }: FormProps &
   DatedProps & {
     customers: CustomerOption[];
+    /** Products other than milk. */
+    products?: ProductOption[];
     /** The shop's selling price, set by the owner. */
     salePriceCents: number | null;
     /** Owners may change the price for this one sale. */
@@ -185,6 +219,7 @@ export function SaleForm({
       // Blank = the shop's price, decided on the server.
       pricePerLitre: canEditPrice ? priceString(salePriceCents) : '',
       paymentMethod: defaultCustomerId ? 'credit' : 'cash',
+      productId: '',
       customerId: defaultCustomerId ?? '',
       dueDate: '',
       date: date ?? '',
@@ -192,13 +227,30 @@ export function SaleForm({
     },
     { success: 'Sale recorded', onSuccess: onDone },
   );
-  const [litres, price, method, customerId] = form.watch(['litres', 'pricePerLitre', 'paymentMethod', 'customerId']);
+  const [litres, price, method, customerId, productId] = form.watch([
+    'litres',
+    'pricePerLitre',
+    'paymentMethod',
+    'customerId',
+    'productId',
+  ]);
+  const product = products.find((p) => p.id === productId);
+  const unit: ProductUnit = product?.unit ?? 'litre';
+  const fixedCents = product ? product.salePriceCents : salePriceCents;
 
-  if (!canEditPrice && salePriceCents == null) {
+  // Switching product brings in its price (owners can still change it).
+  const lastProduct = useRef(productId);
+  useEffect(() => {
+    if (productId === lastProduct.current) return;
+    lastProduct.current = productId;
+    if (canEditPrice) form.setValue('pricePerLitre', priceString(fixedCents));
+  }, [canEditPrice, productId, fixedCents, form]);
+
+  if (!canEditPrice && salePriceCents == null && products.length === 0) {
     return <Notice>The owner hasn&apos;t set a selling price yet, so sales can&apos;t be recorded.</Notice>;
   }
 
-  const unitCents = canEditPrice ? parsePrice(price) : salePriceCents;
+  const unitCents = canEditPrice ? parsePrice(price) : fixedCents;
   const total = previewTotalCents(litres, unitCents);
   const customer = method === 'credit' ? customers.find((c) => c.id === customerId) : undefined;
 
@@ -206,20 +258,34 @@ export function SaleForm({
     <Form {...form}>
       <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <PastDayNotice date={date} />
-        <TextField name="litres" label="Litres" kind="litres" autoFocus presets={litrePresets(['0.5', '1', '2', '5'])} />
+        {products.length > 0 && <ChoiceField name="productId" label="Product" options={productChoices(products)} wrap />}
+        <TextField
+          name="litres"
+          label={product ? `Quantity (${UNIT_SUFFIX[unit]})` : 'Litres'}
+          kind="litres"
+          suffix={UNIT_SUFFIX[unit]}
+          autoFocus
+          presets={presetsFor(unit)}
+        />
         {canEditPrice ? (
           <TextField
             name="pricePerLitre"
-            label="Price / litre"
+            label={product ? `Price / ${UNIT_WORD[unit]}` : 'Price / litre'}
             kind="money"
             description={
-              salePriceCents != null
-                ? `Shop price ${formatKES(salePriceCents)}. A change here is for this sale only.`
-                : 'Set a shop price in Settings so sellers can sell.'
+              fixedCents != null
+                ? `Usual price ${formatKES(fixedCents)}. A change here is for this sale only.`
+                : product
+                  ? `Set ${product.name}'s price under Inventory so sellers can sell it.`
+                  : 'Set a shop price in Settings so sellers can sell.'
             }
           />
+        ) : fixedCents != null ? (
+          <FixedPrice cents={fixedCents} />
         ) : (
-          <FixedPrice cents={salePriceCents!} />
+          <p className="text-sm text-red-600 dark:text-red-400">
+            The owner hasn&apos;t set a price for {product?.name ?? 'milk'} yet, so it can&apos;t be sold.
+          </p>
         )}
         <ChoiceField name="paymentMethod" label="Paid by" options={SALE_METHODS} />
         {method === 'credit' && (
@@ -245,12 +311,19 @@ export function SaleForm({
 
 export function DeliveryForm({
   suppliers,
+  products = [],
   canEditPrice,
   defaultSupplierId,
   date,
   onDone,
 }: FormProps &
-  DatedProps & { suppliers: SupplierOption[]; canEditPrice: boolean; defaultSupplierId?: string }) {
+  DatedProps & {
+    suppliers: SupplierOption[];
+    canEditPrice: boolean;
+    defaultSupplierId?: string;
+    /** Owners can also record stock bought in (mala, packets…). */
+    products?: ProductOption[];
+  }) {
   // Sellers only type in deliveries for suppliers without their own login;
   // the rest record their own, and the seller approves them instead.
   const allSuppliers = suppliers;
@@ -261,6 +334,7 @@ export function DeliveryForm({
     recordDeliveryAction,
     {
       supplierId: initial?.id ?? '',
+      productId: '',
       litres: '',
       pricePerLitre: canEditPrice ? priceString(initial?.defaultPricePerLitreCents) : '',
       date: date ?? '',
@@ -268,16 +342,19 @@ export function DeliveryForm({
     },
     { success: 'Delivery recorded', onSuccess: onDone },
   );
-  const [supplierId, litres, price] = form.watch(['supplierId', 'litres', 'pricePerLitre']);
+  const [supplierId, litres, price, productId] = form.watch(['supplierId', 'litres', 'pricePerLitre', 'productId']);
   const supplier = suppliers.find((s) => s.id === supplierId);
+  const product = canEditPrice ? products.find((p) => p.id === productId) : undefined;
+  const unit: ProductUnit = product?.unit ?? 'litre';
 
-  // Switching supplier brings in that supplier's agreed price.
-  const lastSupplier = useRef(supplierId);
+  // Switching supplier or product brings in the agreed price / usual cost.
+  const last = useRef(`${supplierId}|${productId}`);
   useEffect(() => {
-    if (!canEditPrice || supplierId === lastSupplier.current) return;
-    lastSupplier.current = supplierId;
-    form.setValue('pricePerLitre', priceString(supplier?.defaultPricePerLitreCents));
-  }, [canEditPrice, supplierId, supplier, form]);
+    const key = `${supplierId}|${productId}`;
+    if (!canEditPrice || key === last.current) return;
+    last.current = key;
+    form.setValue('pricePerLitre', priceString(product ? product.costPriceCents : supplier?.defaultPricePerLitreCents));
+  }, [canEditPrice, supplierId, productId, supplier, product, form]);
 
   if (allSuppliers.length === 0) return <NoSuppliers />;
   if (suppliers.length === 0) {
@@ -300,8 +377,17 @@ export function DeliveryForm({
             options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
           />
         )}
-        <TextField name="litres" label="Litres received" kind="litres" autoFocus />
-        {canEditPrice && supplier?.selfRecords && (
+        {canEditPrice && products.length > 0 && (
+          <ChoiceField name="productId" label="What came in" options={productChoices(products)} wrap />
+        )}
+        <TextField
+          name="litres"
+          label={product ? `Quantity received (${UNIT_SUFFIX[unit]})` : 'Litres received'}
+          kind="litres"
+          suffix={UNIT_SUFFIX[unit]}
+          autoFocus
+        />
+        {canEditPrice && !product && supplier?.selfRecords && (
           <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
             {supplier.name} records their own deliveries for approval. Only record one here if they can&apos;t.
           </p>
@@ -310,10 +396,12 @@ export function DeliveryForm({
           <>
             <TextField
               name="pricePerLitre"
-              label="Cost / litre"
+              label={product ? `Cost / ${UNIT_WORD[unit]}` : 'Cost / litre'}
               kind="money"
               description={
-                supplier?.defaultPricePerLitreCents != null
+                product
+                  ? `Buying ${product.name} for stock.`
+                  : supplier?.defaultPricePerLitreCents != null
                   ? `Agreed price ${formatKES(supplier.defaultPricePerLitreCents)}. A change here is for this delivery only.`
                   : 'No agreed price yet: set one on the supplier page so deliveries can be recorded and approved.'
               }
@@ -329,6 +417,84 @@ export function DeliveryForm({
           )
         )}
         <SubmitButton pending={pending}>Record delivery</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+// --- products -------------------------------------------------------------------
+
+export interface ProductDetails {
+  id: string;
+  name: string;
+  unit: ProductUnit;
+  salePriceCents: number | null;
+  costPriceCents: number | null;
+  reorderLevel: number | null;
+}
+
+const UNIT_OPTIONS: Option[] = [
+  { value: 'piece', label: 'Pieces' },
+  { value: 'litre', label: 'Litres' },
+  { value: 'kg', label: 'Kilograms' },
+];
+
+const quantityString = (milli: number | null | undefined) => (milli != null ? String(milli / 1000) : '');
+
+function ProductFields() {
+  return (
+    <>
+      <TextField name="name" label="Name" description="e.g. Mala 500ml, Yoghurt 250ml, Ghee" />
+      <ChoiceField name="unit" label="Sold by" options={UNIT_OPTIONS} />
+      <TextField name="salePrice" label="Selling price" kind="money" description="Per piece, litre or kg. Sellers always use it." />
+      <TextField name="costPrice" label="Usual buying price (optional)" kind="money" />
+      <TextField
+        name="reorderLevel"
+        label="Warn when stock falls to (optional)"
+        kind="litres"
+        suffix=""
+        description="Shows the product as low on stock."
+      />
+    </>
+  );
+}
+
+export function ProductForm({ onDone }: FormProps) {
+  const { form, onSubmit, pending } = useActionForm(
+    productSchema,
+    createProductAction,
+    { name: '', unit: 'piece', salePrice: '', costPrice: '', reorderLevel: '' },
+    { success: 'Product added', onSuccess: onDone },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <ProductFields />
+        <SubmitButton pending={pending}>Add product</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+export function EditProductForm({ product, onDone }: FormProps & { product: ProductDetails }) {
+  const { form, onSubmit, pending } = useActionForm(
+    updateProductSchema,
+    updateProductAction,
+    {
+      productId: product.id,
+      name: product.name,
+      unit: product.unit,
+      salePrice: priceString(product.salePriceCents),
+      costPrice: priceString(product.costPriceCents),
+      reorderLevel: quantityString(product.reorderLevel),
+    },
+    { success: 'Product saved', onSuccess: onDone, keepValues: true },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <ProductFields />
+        <SubmitButton pending={pending}>Save changes</SubmitButton>
       </form>
     </Form>
   );
@@ -418,18 +584,33 @@ export function InviteSupplierForm({
   );
 }
 
-export function SpoilageForm({ date, onDone }: FormProps & DatedProps) {
+export function SpoilageForm({
+  date,
+  products = [],
+  defaultProductId,
+  onDone,
+}: FormProps & DatedProps & { products?: ProductOption[]; defaultProductId?: string }) {
   const { form, onSubmit, pending } = useActionForm(
     spoilageSchema,
     recordSpoilageAction,
-    { litres: '', reason: 'sour', date: date ?? '', note: '' },
+    { productId: defaultProductId ?? '', litres: '', reason: 'sour', date: date ?? '', note: '' },
     { success: 'Spoilage recorded', onSuccess: onDone },
   );
+  const product = products.find((p) => p.id === form.watch('productId'));
+  const unit: ProductUnit = product?.unit ?? 'litre';
   return (
     <Form {...form}>
       <form onSubmit={onSubmit} className="grid gap-5" noValidate>
         <PastDayNotice date={date} />
-        <TextField name="litres" label="Litres lost" kind="litres" autoFocus presets={litrePresets(['0.5', '1', '2'])} />
+        {products.length > 0 && <ChoiceField name="productId" label="What was lost" options={productChoices(products)} wrap />}
+        <TextField
+          name="litres"
+          label={product ? `Quantity lost (${UNIT_SUFFIX[unit]})` : 'Litres lost'}
+          kind="litres"
+          suffix={UNIT_SUFFIX[unit]}
+          autoFocus
+          presets={presetsFor(unit).slice(0, 3)}
+        />
         <SelectField name="reason" label="Reason" options={toOptions(SPOILAGE_REASONS)} />
         <TextField name="note" label="Note (optional)" />
         <SubmitButton pending={pending}>Record spoilage</SubmitButton>

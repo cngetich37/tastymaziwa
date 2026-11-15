@@ -111,6 +111,8 @@ export const saleSchema = z
     /** Owner-only override; blank means the shop's selling price. */
     pricePerLitre: optionalField(kesField('Price per litre')),
     paymentMethod: z.enum(PAYMENT_METHODS),
+    /** Blank = fresh milk. `litres` is then the quantity in that product's unit. */
+    productId: optionalField(id),
     customerId: optionalField(id),
     dueDate: optionalField(isoDate),
     date: entryDate,
@@ -123,12 +125,30 @@ export const saleSchema = z
 
 export const deliverySchema = z.object({
   supplierId: id,
+  /** Blank = fresh milk; a product = a stock purchase (owner only). */
+  productId: optionalField(id),
   litres: litresField(),
   /** Owner-only override; blank means the supplier's agreed price. */
   pricePerLitre: optionalField(kesFieldAllowZero('Price per litre')),
   date: entryDate,
   note: optionalText(),
 });
+
+// --- products ------------------------------------------------------------------
+
+export const PRODUCT_UNITS = ['piece', 'litre', 'kg'] as const;
+
+export const productSchema = z.object({
+  name: z.string().trim().min(2, 'Enter a name').max(80),
+  unit: z.enum(PRODUCT_UNITS),
+  salePrice: optionalField(kesFieldAllowZero('Selling price')),
+  costPrice: optionalField(kesFieldAllowZero('Buying price')),
+  /** In the product's unit; warns when stock falls to it. */
+  reorderLevel: optionalField(scaledField(litresToMl, 'Reorder level', { allowZero: true })),
+});
+
+export const updateProductSchema = productSchema.extend({ productId: id });
+export const archiveProductSchema = z.object({ productId: id, archived: z.boolean() });
 
 // --- supplier-recorded deliveries ---------------------------------------------
 
@@ -174,6 +194,8 @@ export const expenseSchema = z.object({
 });
 
 export const spoilageSchema = z.object({
+  /** Blank = fresh milk. */
+  productId: optionalField(id),
   litres: litresField(),
   reason: z.enum(SPOILAGE_REASONS),
   date: entryDate,
@@ -350,5 +372,7 @@ export type SubscriptionInput = z.output<typeof subscriptionSchema>;
 export type SignupInput = z.output<typeof signupSchema>;
 export type InviteStaffInput = z.output<typeof inviteStaffSchema>;
 export type InviteSupplierInput = z.output<typeof inviteSupplierSchema>;
+export type ProductInput = z.output<typeof productSchema>;
+export type UpdateProductInput = z.output<typeof updateProductSchema>;
 export type SubmitDeliveryInput = z.output<typeof submitDeliverySchema>;
 export type ReviewDeliveryInput = z.output<typeof reviewDeliverySchema>;

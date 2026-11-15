@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, use, type ReactNode } from 'react';
-import type { CustomerOption, SupplierOption } from '@/components/forms/entry-forms';
+import type { CustomerOption, ProductOption, SupplierOption } from '@/components/forms/entry-forms';
 
 /**
  * What the entry forms need (customer and supplier pickers, the usual price).
@@ -11,6 +11,8 @@ import type { CustomerOption, SupplierOption } from '@/components/forms/entry-fo
 export interface EntryData {
   customers: CustomerOption[];
   suppliers: SupplierOption[];
+  /** Products other than milk, active only. */
+  products: ProductOption[];
   /** The owner's selling price; null until it is set in Settings. */
   salePriceCents: number | null;
   isOwner: boolean;

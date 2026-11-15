@@ -1,6 +1,8 @@
 import {
   BookOpen,
+  Boxes,
   ChartColumn,
+  ClipboardCheck,
   LayoutDashboard,
   Milk,
   Settings,
@@ -15,40 +17,67 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  ownerOnly?: boolean;
+  /** Who sees it. Defaults to owners only. */
+  roles?: Role[];
 }
 
+/**
+ * An ERP module (Sales, Purchasing, Inventory…). The sidebar lists modules
+ * and their pages; inside a module, `ModuleTabs` shows its pages as tabs.
+ */
 export interface NavGroup {
+  id: string;
   label: string;
+  icon: LucideIcon;
   items: NavItem[];
 }
 
-export const TODAY: NavItem = { href: '/', label: 'Today', icon: LayoutDashboard };
-export const SALES: NavItem = { href: '/sales', label: 'Sales', icon: ShoppingCart };
-export const DELIVERIES: NavItem = { href: '/deliveries', label: 'Deliveries', icon: Truck };
-export const CUSTOMERS: NavItem = { href: '/customers', label: 'Customers', icon: Users, ownerOnly: true };
-export const SUPPLIERS: NavItem = { href: '/suppliers', label: 'Suppliers', icon: Milk, ownerOnly: true };
-export const LEDGER: NavItem = { href: '/ledger', label: 'Ledger', icon: BookOpen, ownerOnly: true };
-export const REPORTS: NavItem = { href: '/reports', label: 'Reports', icon: ChartColumn, ownerOnly: true };
-export const SETTINGS: NavItem = { href: '/settings', label: 'Settings', icon: Settings, ownerOnly: true };
+const STAFF: Role[] = ['owner', 'attendant'];
+
+export const TODAY: NavItem = { href: '/', label: 'Today', icon: LayoutDashboard, roles: STAFF };
+export const SALES: NavItem = { href: '/sales', label: 'Sales', icon: ShoppingCart, roles: STAFF };
+export const DELIVERIES: NavItem = { href: '/deliveries', label: 'Deliveries', icon: Truck, roles: STAFF };
+export const CLOSE: NavItem = { href: '/close', label: 'Close shift', icon: ClipboardCheck, roles: STAFF };
+export const CUSTOMERS: NavItem = { href: '/customers', label: 'Customers', icon: Users };
+export const SUPPLIERS: NavItem = { href: '/suppliers', label: 'Suppliers', icon: Milk };
+export const INVENTORY: NavItem = { href: '/inventory', label: 'Stock & products', icon: Boxes };
+export const LEDGER: NavItem = { href: '/ledger', label: 'Ledger', icon: BookOpen };
+export const REPORTS: NavItem = { href: '/reports', label: 'Reports', icon: ChartColumn };
+export const SETTINGS: NavItem = { href: '/settings', label: 'Settings', icon: Settings };
 
 /**
- * Follows the shop's day: what happens at the counter, who the shop trades
- * with, then the books. Sellers only see the counter.
+ * Owners get the whole business as modules; sellers get the counter only.
+ * Pages are added here as modules ship (see docs/ROADMAP.md).
  */
-const NAV_GROUPS: NavGroup[] = [
-  { label: 'Counter', items: [TODAY, SALES, DELIVERIES] },
-  { label: 'People', items: [CUSTOMERS, SUPPLIERS] },
-  { label: 'Books', items: [REPORTS, LEDGER, SETTINGS] },
+const MODULES: NavGroup[] = [
+  { id: 'home', label: 'Counter', icon: LayoutDashboard, items: [TODAY] },
+  { id: 'sales', label: 'Sales', icon: ShoppingCart, items: [SALES, CUSTOMERS] },
+  { id: 'purchasing', label: 'Purchasing', icon: Truck, items: [DELIVERIES, SUPPLIERS] },
+  { id: 'inventory', label: 'Inventory', icon: Boxes, items: [INVENTORY] },
+  { id: 'finance', label: 'Finance', icon: BookOpen, items: [LEDGER] },
+  { id: 'insights', label: 'Insights', icon: ChartColumn, items: [REPORTS, SETTINGS] },
 ];
 
+const canSee = (item: NavItem, role: Role) => (item.roles ?? ['owner']).includes(role);
+
 export const navGroupsFor = (role: Role): NavGroup[] =>
-  NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !i.ownerOnly || role === 'owner') })).filter(
-    (g) => g.items.length > 0,
-  );
+  MODULES.map((g) => ({ ...g, items: g.items.filter((i) => canSee(i, role)) })).filter((g) => g.items.length > 0);
 
 export const isActive = (pathname: string, href: string) =>
   href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+
+/** The module the current page belongs to (the longest matching link wins). */
+export function moduleFor(pathname: string, role: Role): { group: NavGroup; active: NavItem } | null {
+  let best: { group: NavGroup; active: NavItem } | null = null;
+  for (const group of navGroupsFor(role)) {
+    for (const item of group.items) {
+      if (isActive(pathname, item.href) && (!best || item.href.length > best.active.href.length)) {
+        best = { group, active: item };
+      }
+    }
+  }
+  return best;
+}
 
 /** Remembers the desktop sidebar's collapsed state, so the server renders it right first time. */
 export const SIDEBAR_COOKIE = 'sidebar';

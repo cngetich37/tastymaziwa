@@ -3,21 +3,23 @@ import { SessionTimeout } from '@/components/session-timeout';
 import { DesktopSidebar } from '@/components/shell/app-sidebar';
 import { EntryDataProvider } from '@/components/shell/entry-data';
 import { MobileHeader, MobileTabBar } from '@/components/shell/mobile-shell';
+import { ModuleTabs } from '@/components/shell/module-tabs';
 import { SIDEBAR_COOKIE } from '@/components/shell/nav-items';
 import { getDb } from '@/db';
 import { authConfig } from '@/server/auth/config';
-import { getShop, getSupplierLogins, listCustomers, listSuppliers } from '@/server/queries';
+import { getShop, getStockLevels, getSupplierLogins, listCustomers, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
 /** The shop's own pages: owners and sellers. Supplier logins are sent to /supply. */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const db = await getDb();
-  const [shop, customers, suppliers, logins, cookieStore] = await Promise.all([
+  const [shop, customers, suppliers, logins, stock, cookieStore] = await Promise.all([
     getShop(db, user.shopId),
     listCustomers(db, user.shopId),
     listSuppliers(db, user.shopId),
     getSupplierLogins(db, user.shopId),
+    getStockLevels(db, user.shopId),
     cookies(),
   ]);
   const isOwner = user.role === 'owner';
@@ -38,6 +40,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       payableCents: isOwner ? s.payableCents : undefined,
       selfRecords: logins.get(s.id)?.active === true,
     })),
+    products: stock
+      .filter((p) => p.productId != null)
+      .map((p) => ({
+        id: p.productId!,
+        name: p.name,
+        unit: p.unit,
+        salePriceCents: p.salePriceCents,
+        costPriceCents: isOwner ? p.costPriceCents : null,
+      })),
   };
 
   return (
@@ -52,6 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <MobileHeader user={me} shopName={shopName} />
           {/* Bottom padding clears the phone tab bar and its raised Record button. */}
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12">
+            <ModuleTabs role={user.role} />
             {children}
           </main>
         </div>

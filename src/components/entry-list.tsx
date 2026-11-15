@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { formatShortDate, formatTime } from '@/lib/dates';
-import { formatKES, formatKESSigned, formatLitres } from '@/lib/money';
+import { formatKES, formatKESSigned, formatQuantity } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import type { LedgerListItem } from '@/server/queries';
 
@@ -50,14 +50,14 @@ function cashEffect(e: LedgerListItem): number | null {
 /** Buying prices and delivery costs: owners only. */
 const isCost = (e: LedgerListItem) => e.kind === 'delivery' || e.kind === 'supplier_payment';
 
+const quantity = (e: LedgerListItem, milli: number) => formatQuantity(milli, e.productUnit ?? 'litre');
+
 function describe(e: LedgerListItem, hideCosts = false): string {
   const parts: string[] = [];
+  if (e.productName) parts.push(e.productName);
   if (e.volumeMl) {
-    parts.push(
-      e.unitPriceCents != null && !(hideCosts && isCost(e))
-        ? `${formatLitres(Math.abs(e.volumeMl))} @ ${formatKES(e.unitPriceCents)}`
-        : formatLitres(Math.abs(e.volumeMl)),
-    );
+    const qty = quantity(e, Math.abs(e.volumeMl));
+    parts.push(e.unitPriceCents != null && !(hideCosts && isCost(e)) ? `${qty} @ ${formatKES(e.unitPriceCents)}` : qty);
   }
   if (e.customerName) parts.push(e.customerName);
   if (e.supplierName) parts.push(e.supplierName);
@@ -115,12 +115,12 @@ export function EntryList({
                   )}
                 >
                   {hideCosts && isCost(e)
-                    ? formatLitres(e.volumeMl)
+                    ? quantity(e, e.volumeMl)
                     : cash != null
                     ? formatKESSigned(cash)
                     : e.amountCents
                       ? formatKES(e.amountCents)
-                      : formatLitres(e.volumeMl)}
+                      : quantity(e, e.volumeMl)}
                 </span>
                 {canReverse && !reversed && !isReversal && (
                   <Button

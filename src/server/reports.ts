@@ -66,12 +66,13 @@ async function byDay(db: DB, shopId: string, range: DateRange) {
       businessDate: ledgerEntries.businessDate,
       kind: ledgerEntries.kind,
       paymentMethod: ledgerEntries.paymentMethod,
+      productId: ledgerEntries.productId,
       amountCents: sumAmount,
       volumeMl: sumVolume,
     })
     .from(ledgerEntries)
     .where(and(eq(ledgerEntries.shopId, shopId), inRange(range)))
-    .groupBy(ledgerEntries.businessDate, ledgerEntries.kind, ledgerEntries.paymentMethod)
+    .groupBy(ledgerEntries.businessDate, ledgerEntries.kind, ledgerEntries.paymentMethod, ledgerEntries.productId)
     .orderBy(asc(ledgerEntries.businessDate));
 }
 
@@ -196,7 +197,8 @@ async function deliveriesReport(db: DB, shopId: string, range: DateRange): Promi
         supplierId: ledgerEntries.supplierId,
         name: suppliers.name,
         deliveries: countOriginals,
-        volumeMl: sumVolume,
+        // Litres of milk; other stock bought from them counts in cost only.
+        volumeMl: sql<number>`coalesce(sum(${ledgerEntries.volumeMl}) filter (where ${ledgerEntries.productId} is null), 0)`.mapWith(Number),
         amountCents: sumAmount,
       })
       .from(ledgerEntries)
@@ -371,7 +373,7 @@ async function suppliersReport(db: DB, shopId: string, range: DateRange): Promis
         supplierId: ledgerEntries.supplierId,
         kind: ledgerEntries.kind,
         amountCents: sumAmount,
-        volumeMl: sumVolume,
+        volumeMl: sql<number>`coalesce(sum(${ledgerEntries.volumeMl}) filter (where ${ledgerEntries.productId} is null), 0)`.mapWith(Number),
       })
       .from(ledgerEntries)
       .where(
@@ -478,7 +480,7 @@ async function staffReport(db: DB, shopId: string, range: DateRange): Promise<Re
         kind: ledgerEntries.kind,
         count: sql<number>`count(*) filter (where ${reversal.id} is null)`.mapWith(Number),
         reversed: sql<number>`count(${reversal.id})`.mapWith(Number),
-        volumeMl: sql<number>`coalesce(sum(${ledgerEntries.volumeMl}) filter (where ${reversal.id} is null), 0)`.mapWith(Number),
+        volumeMl: sql<number>`coalesce(sum(${ledgerEntries.volumeMl}) filter (where ${reversal.id} is null and ${ledgerEntries.productId} is null), 0)`.mapWith(Number),
         amountCents: sql<number>`coalesce(sum(${ledgerEntries.amountCents}) filter (where ${reversal.id} is null), 0)`.mapWith(Number),
       })
       .from(ledgerEntries)

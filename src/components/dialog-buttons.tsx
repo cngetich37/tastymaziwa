@@ -1,12 +1,18 @@
 'use client';
 /** Client-side dialog triggers for use inside Server Component pages. */
 
-import { Pencil, Plus } from 'lucide-react';
+import { useTransition } from 'react';
+import { Archive, ArchiveRestore, Pencil, Plus } from 'lucide-react';
+import { archiveProductAction } from '@/app/actions';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { FormDialog } from '@/components/form-dialog';
 import {
   CustomerForm,
   EditCustomerForm,
+  EditProductForm,
+  ProductForm,
+  type ProductDetails,
   EditSupplierForm,
   InviteStaffForm,
   InviteSupplierForm,
@@ -110,5 +116,66 @@ export function InviteSupplierButton({ supplierId, supplierName }: { supplierId:
     >
       {(close) => <InviteSupplierForm supplierId={supplierId} supplierName={supplierName} onDone={close} />}
     </FormDialog>
+  );
+}
+
+export function AddProductButton() {
+  return (
+    <FormDialog
+      trigger={
+        <Button className="h-11 gap-2">
+          <Plus className="size-4" aria-hidden /> Product
+        </Button>
+      }
+      title="Add a product"
+      description="Anything you sell besides fresh milk. Stock comes in when you record it bought, and goes out as it is sold."
+    >
+      {(close) => <ProductForm onDone={close} />}
+    </FormDialog>
+  );
+}
+
+export function EditProductButton({ product }: { product: ProductDetails }) {
+  return (
+    <FormDialog
+      trigger={
+        <Button variant="ghost" size="icon" className="size-11" aria-label={`Edit ${product.name}`}>
+          <Pencil className="size-4" aria-hidden />
+        </Button>
+      }
+      title={`Edit ${product.name}`}
+      description="New prices apply from now on. Past sales keep theirs."
+    >
+      {(close) => <EditProductForm product={product} onDone={close} />}
+    </FormDialog>
+  );
+}
+
+/** Stop (or resume) selling a product. Its history stays. */
+export function ArchiveProductButton({ id, name, archived }: { id: string; name: string; archived: boolean }) {
+  const [pending, startTransition] = useTransition();
+  const Icon = archived ? ArchiveRestore : Archive;
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-11"
+      disabled={pending}
+      aria-label={archived ? `Sell ${name} again` : `Stop selling ${name}`}
+      title={archived ? 'Sell again' : 'Stop selling'}
+      onClick={() => {
+        if (!archived && !confirm(`Stop selling ${name}? It disappears from the sale form; its history stays.`)) return;
+        startTransition(async () => {
+          const result = await archiveProductAction({ productId: id, archived: !archived });
+          toast(
+            result.ok
+              ? { title: archived ? `${name} is back on sale` : `${name} archived` }
+              : { variant: 'destructive', title: 'Not changed', description: result.error },
+          );
+        });
+      }}
+    >
+      <Icon className="size-4" aria-hidden />
+    </Button>
   );
 }

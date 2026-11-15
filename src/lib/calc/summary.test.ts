@@ -74,3 +74,22 @@ describe('dailySeries', () => {
     expect(series.map((p) => p.grossProfitCents)).toEqual([-400, 0, 1000]);
   });
 });
+
+describe('products', () => {
+  it('counts every product in money but only milk in litres and stock', () => {
+    const s = summarize([
+      { kind: 'delivery', paymentMethod: null, amountCents: 5000, volumeMl: 10_000 },
+      { kind: 'delivery', paymentMethod: null, amountCents: 3000, volumeMl: 6000, productId: 'mala' },
+      { kind: 'sale', paymentMethod: 'cash', amountCents: 7000, volumeMl: 1000, productId: null },
+      { kind: 'sale', paymentMethod: 'mpesa', amountCents: 1200, volumeMl: 2000, productId: 'mala' },
+      { kind: 'spoilage', paymentMethod: null, amountCents: 0, volumeMl: 1000, productId: 'mala' },
+    ]);
+    expect(s.salesCents).toBe(8200);
+    expect(s.mpesaSalesCents).toBe(1200);
+    expect(s.deliveryCostCents).toBe(8000);
+    expect(s.salesMl).toBe(1000);
+    expect(s.deliveredMl).toBe(10_000);
+    expect(s.spoiledMl).toBe(0);
+    expect(s.stockChangeMl).toBe(9000);
+  });
+});

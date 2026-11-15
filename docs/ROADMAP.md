@@ -27,6 +27,8 @@ Mark each item done with `[x]` as it ships.
 
 ## UX: app shell and forms
 
+- [x] **ERP redesign, step 1.** Inter, a calmer neutral palette with an accessible emerald brand colour, tabular figures. Navigation by module (Counter, Sales, Purchasing, Inventory, Finance, Insights) with a tab bar per module (`ModuleTabs`). `DataTable`: a table on tablets and up, stacked cards on phones.
+
 - [x] **Sidebar navigation.** On desktop, a left sidebar holds the shop, a **Record** button, nav groups (Shop / Manage), the theme and the account menu. It collapses to an icon rail (Ctrl+B), and the server remembers the state in a cookie. On phones, a bottom tab bar (Today, Ledger, raised **Record**, Credit, Menu) keeps navigation in thumb reach, and Menu slides out the full sidebar.
 - [x] **Record from anywhere.** One dialog covers every ledger entry ("What happened?" then the form). The layout loads the customer and supplier pickers once, so it works on every page.
 - [x] **Better forms.** Dialogs become bottom sheets on phones. Litre quick-pick chips (½, 1, 2, 5 L) make a cash sale three taps. Payment-method buttons have icons, payments have a "Full balance" chip, the live total is large, a credit sale shows the customer's new balance, and the button shows "Saving…" while it works. The keyboard no longer covers sheets on Android (`interactive-widget=resizes-content`).
@@ -69,6 +71,11 @@ Mark each item done with `[x]` as it ships.
 - [x] **Supplier accounts.** Support several milkmen, each with deliveries, the price per litre, and payments made. Show the running payable. (`/suppliers/[id]`)
 - [ ] **Delivery quality notes**, such as rejected litres or a failed lactometer reading, which reduce what is owed.
 - [ ] **Supplier statement** exportable as PDF to settle the weekly or monthly account.
+
+### Products and inventory
+- [x] **Products besides milk** (mala, yoghurt, ghee, packets): unit (piece / litre / kg), selling and buying price, reorder level. `ledger_entries.product_id` (null = fresh milk). Money totals include every product; litres and milk stock stay milk-only.
+- [x] **Inventory page** (`/inventory`): stock on hand per product, sold in 7 days, days of stock left, stock value at cost, low-stock alerts, stock in / write off, archive.
+- [ ] Stock count adjustments (counted vs expected) per product, beyond milk.
 
 ### Stock and wastage
 - [ ] **Daily close wizard.** Opening stock + deliveries − sales − spoilage = expected closing stock. The attendant enters the actual count, and the app records the variance.
