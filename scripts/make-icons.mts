@@ -46,6 +46,8 @@ const icons = [
   { file: 'icon-512.png', size: 512, scale: 0.92, rounded: true },
   { file: 'icon-maskable-512.png', size: 512, scale: 0.72, rounded: false },
   { file: 'apple-touch-icon.png', size: 180, scale: 0.86, rounded: false },
+  // Email header: shown at 32px, drawn at 2x for sharp phone screens.
+  { file: 'email-logo.png', size: 64, scale: 1, rounded: true },
 ];
 
 mkdirSync(OUT, { recursive: true });

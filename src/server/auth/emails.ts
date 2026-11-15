@@ -1,14 +1,26 @@
 /** Email templates: short, plain, readable on a phone notification. */
 import { BRAND } from '@/lib/brand';
+import { appUrl } from './config';
 import type { Email } from './mailer';
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/**
+ * The churn logo and wordmark. A hosted PNG, because most mail apps block SVG
+ * and inline (data:) images; if images are off, the wordmark still shows.
+ * A table keeps the two side by side in Outlook too.
+ */
+const header = () =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px"><tr>
+<td style="padding:0 10px 0 0;vertical-align:middle"><img src="${esc(appUrl())}/icons/email-logo.png" width="32" height="32" alt="" style="display:block;border:0"></td>
+<td style="vertical-align:middle;font-size:18px;font-weight:bold;color:${BRAND.blue}">TastyMaziwa</td>
+</tr></table>`;
+
 function layout(body: string): string {
   return `<!doctype html><html><body style="margin:0;padding:24px;background:${BRAND.cream};font-family:Arial,Helvetica,sans-serif;color:${BRAND.ink}">
 <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;padding:24px">
-<p style="margin:0 0 16px;font-size:18px;font-weight:bold;color:${BRAND.blue}">🥛 TastyMaziwa</p>
+${header()}
 ${body}
 <p style="margin:24px 0 0;font-size:12px;color:#6b7280">If you didn't ask for this, you can ignore this email — nothing will change.</p>
 </div></body></html>`;
