@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { PwaRegister } from '@/components/pwa';
 import { ThemeProvider } from '@/components/theme-provider';
 
 // Self-hosted at build time: no request to Google on the shop's data bundle.
@@ -13,7 +14,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'TastyMaziwa',
+  applicationName: 'TastyMaziwa',
   description: 'Daily milk sales, credit and profit for your maziwa shop.',
+  // iPhone home-screen app: full-screen, with our icon and name.
+  appleWebApp: { capable: true, title: 'TastyMaziwa', statusBarStyle: 'default' },
+  icons: { apple: '/icons/apple-touch-icon.png' },
 };
 
 export const viewport: Viewport = {
@@ -34,6 +39,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
+          <PwaRegister />
         </ThemeProvider>
       </body>
     </html>

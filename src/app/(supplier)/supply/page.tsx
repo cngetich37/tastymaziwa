@@ -1,6 +1,7 @@
 import { CheckCircle2, Hourglass, Truck, Wallet, XCircle } from 'lucide-react';
 import { SubmitDeliveryForm } from '@/components/forms/entry-forms';
 import { PageHeader } from '@/components/page-header';
+import { InstallBanner } from '@/components/pwa';
 import { StatCard } from '@/components/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +43,7 @@ export default async function SupplyPage() {
   return (
     <div className="grid grid-cols-1 gap-6">
       <PageHeader title={`Habari, ${user.name.split(' ')[0]}`} description={`Deliveries to ${shopName}`} />
+      <InstallBanner />
 
       <Card>
         <CardHeader>

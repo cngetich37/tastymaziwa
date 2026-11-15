@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
 /** Pages reachable without a session. */
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password'];
+const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/offline'];
 
 /**
  * First line of defence only: redirects signed-out visitors to /login and,
@@ -26,5 +26,8 @@ export default auth((req) => {
 
 export const config = {
   // Skip auth endpoints, cron (bearer token), M-Pesa callbacks (per-request / per-shop secrets) and static assets.
-  matcher: ['/((?!api/auth|api/cron|api/mpesa|api/payments|_next/static|_next/image|favicon.ico).*)'],
+  // The app manifest, service worker and icons must load signed out, so the login page is installable.
+  matcher: [
+    '/((?!api/auth|api/cron|api/mpesa|api/payments|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons/).*)',
+  ],
 };

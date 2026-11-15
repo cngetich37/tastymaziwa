@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Truck,
 } from 'lucide-react';
+import { InstallBanner } from '@/components/pwa';
 import { ModuleLauncher, NeedsAttention, type AttentionItem } from '@/components/workspace';
 import { countUnmatchedC2b } from '@/server/mpesa/c2b';
 import { budgetStatus, monthRange } from '@/lib/calc/finance';
@@ -109,6 +110,7 @@ export default async function DashboardPage() {
           </Button>
         }
       />
+        <InstallBanner />
         <PendingDeliveriesCard deliveries={pending} today={dash.today} />
         <QuickActions />
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -239,6 +241,8 @@ export default async function DashboardPage() {
           },
         ]}
       />
+
+      <InstallBanner />
 
       <PendingDeliveriesCard deliveries={pending} today={dash.today} />
 

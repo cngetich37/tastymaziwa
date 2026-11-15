@@ -111,7 +111,8 @@ Mark each item done with `[x]` as it ships.
 
 ## P2: Standout features
 
-- [ ] **Offline-first PWA.** The app installs to the home screen. Sales are recorded offline into IndexedDB (Dexie) and sync when the connection returns, with a visible "3 unsynced" badge. Serwist handles the service worker.
+- [x] **Installable PWA.** Web app manifest (`app/manifest.ts`: standalone, maskable icons, shortcuts to Sales / Deliveries / Close shift), icons drawn by `scripts/make-icons.mts`, Apple home-screen tags, and an "Install app" button (the browser's prompt on Android/Chrome, Share → Add to Home Screen steps on iPhone) in the menu plus a dismissible banner on Today and the supplier page. A hand-written service worker (`public/sw.js`, versioned per build via `/sw.js?v=<build>`) caches only content-hashed code and icons, and shows `/offline` when a page can't load; it never stores pages or shop data.
+- [ ] **Offline sales.** Record sales offline into IndexedDB and sync when the connection returns, with a visible "3 unsynced" badge (idempotency keys make the sync safe to retry).
 - [ ] **Swahili UI (`sw-KE`)** with a language toggle, using `next-intl`.
 - [ ] **AI daily briefing.** A scheduled job writes a 3-line summary each evening: *"Sold 52L (+8% vs last Tuesday). 4L spoiled — 2nd day in a row, check the fridge. Jane is 21 days overdue on KSh 1,200."* Send it to the owner by WhatsApp or push notification.
 - [ ] **Demand forecasting.** Suggest tomorrow's order quantity from weekday patterns, holidays and recent trend, so the owner buys less milk that ends up spoiling. Start with a simple moving average by weekday; only move to ML if that proves not good enough.

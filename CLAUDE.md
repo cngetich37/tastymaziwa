@@ -156,6 +156,12 @@ The database enforces these rules. Don't work around them:
 - CHECK constraints: original rows are non-negative; a credit sale must have a customer; deliveries and supplier payments must have a supplier.
 - `idempotency_key` is unique. Subscription billing uses `sub:<subscriptionId>:<date>`, so running it twice bills nothing extra.
 
+## Installable app (PWA)
+
+- `app/manifest.ts` is the manifest; icons in `public/icons` come from `scripts/make-icons.mts` (rerun it if the logo or brand colour changes).
+- `public/sw.js` is registered by `PwaRegister` (root layout, production only) as `/sw.js?v=<NEXT_PUBLIC_BUILD_ID>`, so each deploy gets a fresh worker and cache. It caches **only** `/_next/static`, icons and the `/offline` page. Never make it cache page HTML, RSC payloads, `/api` or anything holding shop data.
+- The manifest, `sw.js`, icons and `/offline` must stay reachable signed out (see the matcher and `PUBLIC_PATHS` in `src/proxy.ts`).
+
 ## Conventions
 
 ### Money, volume and dates

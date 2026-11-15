@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { LogOut, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react';
 import { Logo } from '@/components/logo';
+import { InstallAppButton } from '@/components/pwa';
 import { ThemeSwitcher, ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import type { Role } from '@/db/schema';
@@ -129,6 +130,7 @@ export function SidebarBody({
       </nav>
 
       <div className={cn('grid gap-1 border-t p-3', collapsed && 'px-2')}>
+        {!collapsed && <InstallAppButton className={dense ? 'h-9' : undefined} />}
         {collapsed ? <ThemeToggle className="mx-auto mb-1 size-11" /> : <div className="mb-2"><ThemeSwitcher /></div>}
         <Link
           href="/account"
