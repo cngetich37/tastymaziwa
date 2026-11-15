@@ -11,12 +11,15 @@ export const metadata = { title: 'Offline · TastyMaziwa' };
 export default function OfflinePage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 text-center">
-      <div className="flex items-center gap-2">
-        <Logo />
+      <div className="flex flex-col items-center gap-2">
+        {/* The logo with a no-Wi-Fi badge on its corner. */}
+        <div className="relative">
+          <Logo className="h-16 w-16" detailed />
+          <span className="absolute -right-2 -bottom-2 flex size-8 items-center justify-center rounded-full border-2 border-background bg-muted">
+            <WifiOff className="size-4 text-muted-foreground" aria-hidden />
+          </span>
+        </div>
         <span className="text-lg font-bold tracking-tight">TastyMaziwa</span>
-      </div>
-      <div className="rounded-full bg-muted p-4">
-        <WifiOff className="size-8 text-muted-foreground" aria-hidden />
       </div>
       <div className="grid max-w-sm gap-2">
         <h1 className="text-2xl font-bold">You&apos;re offline</h1>
