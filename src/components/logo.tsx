@@ -14,7 +14,7 @@ const strokeClass: Record<LogoFill, string> = {
 
 /**
  * The churn mark. Fixed brand colours, so it looks the same in both themes.
- * `detailed` adds the handles and lid rim: only for 64px and up.
+ * `detailed` adds the handles and lid rim: only for 48px and up.
  */
 export function Logo({ className, detailed = false }: { className?: string; detailed?: boolean }) {
   return (
