@@ -8,6 +8,7 @@ import { sessionVersionProof, updateSession } from '@/auth';
 import { ALL_ROLES, OWNER, STAFF, SUPPLIER, defineAction } from '@/server/action';
 import * as accounts from '@/server/auth/accounts';
 import * as ledger from '@/server/ledger';
+import * as c2b from '@/server/mpesa/c2b';
 import * as mpesa from '@/server/mpesa/payments';
 import {
   billSubscriptionsSchema,
@@ -21,6 +22,11 @@ import {
   inviteSupplierSchema,
   archiveProductSchema,
   mpesaCustomerPaymentSchema,
+  c2bIgnoreSchema,
+  c2bToCustomerSchema,
+  c2bToSaleSchema,
+  connectTillSchema,
+  simulateTillPaymentSchema,
   mpesaRequestIdSchema,
   mpesaSaleSchema,
   mpesaSettingsSchema,
@@ -210,6 +216,30 @@ export const startMpesaCustomerPaymentAction = defineAction(
 /** Polled by the counter while the customer answers the prompt. */
 export const mpesaStatusAction = defineAction({ schema: mpesaRequestIdSchema, roles: STAFF }, ({ db, actor }, input) =>
   mpesa.refreshMpesaRequest(db, actor, input.requestId),
+);
+
+// Till / paybill reconciliation (owner)
+
+export const connectTillAction = defineAction({ schema: connectTillSchema, roles: OWNER }, ({ db, actor }) =>
+  c2b.connectTill(db, actor).then(() => null),
+);
+
+export const simulateTillPaymentAction = defineAction(
+  { schema: simulateTillPaymentSchema, roles: OWNER },
+  ({ db, actor }, input) => c2b.simulateTillPayment(db, actor, input).then(() => null),
+);
+
+export const matchC2bToCustomerAction = defineAction(
+  { schema: c2bToCustomerSchema, roles: OWNER },
+  ({ db, actor }, input) => c2b.matchToCustomer(db, actor, input).then(() => null),
+);
+
+export const matchC2bToSaleAction = defineAction({ schema: c2bToSaleSchema, roles: OWNER }, ({ db, actor }, input) =>
+  c2b.matchToSale(db, actor, input).then(() => null),
+);
+
+export const ignoreC2bAction = defineAction({ schema: c2bIgnoreSchema, roles: OWNER }, ({ db, actor }, input) =>
+  c2b.ignoreC2b(db, actor, input).then(() => null),
 );
 
 export const saveMpesaSettingsAction = defineAction(

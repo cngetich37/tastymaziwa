@@ -198,3 +198,25 @@ test('owner sets up M-Pesa prompts, and the counter offers them', async ({ page,
   expect(res.status()).toBe(200);
   expect(await res.json()).toEqual({ ResultCode: 0, ResultDesc: 'Accepted' });
 });
+
+test('owner sees till reconciliation, and Safaricom can reach the confirmation link', async ({ page, request }) => {
+  await signInWithPassword(page, E2E_OWNER.email, E2E_OWNER.password);
+  await page.goto('/mpesa/reconcile');
+  await expect(page.getByRole('heading', { name: 'Till reconciliation' })).toBeVisible();
+  // M-Pesa was set up in the previous test, so the till can be connected.
+  await expect(page.getByText('Connect your till')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Connect till' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Reconciliation totals' })).toContainText('Received on till');
+  await expect(page.getByRole('region', { name: 'Payments to match' })).toContainText('Every payment is matched');
+
+  // Public, never redirected to a login, and a forged confirmation changes nothing.
+  for (const path of ['confirm', 'validate']) {
+    const res = await request.post(`/api/payments/c2b/00000000-0000-4000-8000-000000000000/forged/${path}`, {
+      data: { TransID: 'UCB030CBG1', TransAmount: '100.00', BusinessShortCode: '174379' },
+    });
+    expect(res.status()).toBe(200);
+    expect(await res.json()).toEqual({ ResultCode: '0', ResultDesc: 'Accepted' });
+  }
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Payments to match' })).toContainText('Every payment is matched');
+});

@@ -231,7 +231,7 @@ describe('sale by M-Pesa prompt', () => {
     const { requestId } = await startMpesaSale(db, a.seller, { litres: 2000, productId: mala.id, phone: '+254712345678' }, d.impl);
     const push = d.calls.find((c) => c.url.includes('processrequest'))!.body!;
     expect(push).toMatchObject({ Amount: 120 });
-    expect(String(push.CallBackURL)).toMatch(new RegExp(`^https://duka\\.example/api/mpesa/callback/${requestId}/[\\w-]{20,}$`));
+    expect(String(push.CallBackURL)).toMatch(new RegExp(`^https://duka\\.example/api/payments/stk/${requestId}/[\\w-]{20,}$`));
     expect(await ledgerFor(a.shopId)).toHaveLength(0);
 
     const pending = await requestRow(requestId);

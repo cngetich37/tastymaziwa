@@ -16,6 +16,7 @@ import {
   deliverySubmissions,
   expenseBudgets,
   ledgerEntries,
+  mpesaC2bTransactions,
   products,
   shiftCloses,
   shops,
@@ -24,6 +25,7 @@ import {
   users,
   type LedgerEntry,
   type NewLedgerEntry,
+  type C2bTransaction,
   type MpesaRequest,
   type PayType,
   type Role,
@@ -32,6 +34,7 @@ import { addDays, todayBusinessDate, type BusinessDate } from '@/lib/dates';
 import { expectedTakings } from '@/lib/calc/close';
 import { overCreditLimit } from '@/lib/calc/finance';
 import { computePay, type PayLine } from '@/lib/calc/payroll';
+import { MATCH_WINDOW_MINUTES, closestSale } from '@/lib/calc/reconcile';
 import { formatKES, lineTotalCents } from '@/lib/money';
 import type {
   CustomerInput,
@@ -251,7 +254,7 @@ export function recordSale(db: DB, actor: Actor, input: SaleInput) {
         );
       }
     }
-    return insertEntry(tx, actor, {
+    const entry = await insertEntry(tx, actor, {
       kind: 'sale',
       businessDate,
       productId: product?.id ?? null,
@@ -263,7 +266,34 @@ export function recordSale(db: DB, actor: Actor, input: SaleInput) {
       dueDate: isCredit ? (input.dueDate ?? addDays(businessDate, DEFAULT_CREDIT_DAYS)) : null,
       note: input.note,
     });
+    if (entry.paymentMethod === 'mpesa') await linkIncomingMpesa(tx, actor, entry);
+    return entry;
   });
+}
+
+/**
+ * A seller recorded an M-Pesa sale after the customer paid the till: link it
+ * to that waiting payment (same amount, within the window, closest in time).
+ */
+async function linkIncomingMpesa(tx: Tx, actor: Actor, entry: LedgerEntry) {
+  const waiting = await tx
+    .select({ id: mpesaC2bTransactions.id, amountCents: mpesaC2bTransactions.amountCents, at: mpesaC2bTransactions.transTime })
+    .from(mpesaC2bTransactions)
+    .where(
+      and(
+        eq(mpesaC2bTransactions.shopId, actor.shopId),
+        eq(mpesaC2bTransactions.status, 'unmatched'),
+        eq(mpesaC2bTransactions.amountCents, entry.amountCents),
+        gte(mpesaC2bTransactions.transTime, sql`${entry.occurredAt}::timestamptz - make_interval(mins => ${MATCH_WINDOW_MINUTES})`),
+        lte(mpesaC2bTransactions.transTime, sql`${entry.occurredAt}::timestamptz + make_interval(mins => ${MATCH_WINDOW_MINUTES})`),
+      ),
+    );
+  const match = closestSale(entry.amountCents, entry.occurredAt, waiting);
+  if (!match) return;
+  await tx
+    .update(mpesaC2bTransactions)
+    .set({ status: 'matched_sale', ledgerEntryId: entry.id, matchedBy: actor.id, matchedAt: sql`now()` })
+    .where(and(eq(mpesaC2bTransactions.id, match.id), eq(mpesaC2bTransactions.status, 'unmatched')));
 }
 
 /** Whether a supplier has an active login of their own (and so records their own deliveries). */
@@ -498,6 +528,11 @@ export function reverseEntry(db: DB, actor: Actor, entryId: string, reason: stri
       .from(ledgerEntries)
       .where(eq(ledgerEntries.reversesId, entryId));
     if (existing) throw new DomainError('This entry has already been reversed');
+    // Money that really arrived on the till goes back to the inbox to be matched again.
+    await tx
+      .update(mpesaC2bTransactions)
+      .set({ status: 'unmatched', ledgerEntryId: null, matchedBy: null, matchedAt: null })
+      .where(and(eq(mpesaC2bTransactions.shopId, actor.shopId), eq(mpesaC2bTransactions.ledgerEntryId, original.id)));
 
     return insertEntry(tx, actor, {
       kind: original.kind,
@@ -1317,5 +1352,24 @@ export async function postMpesaRequest(tx: Tx, request: MpesaRequest, receiptNum
     customerId: request.customerId,
     note,
     idempotencyKey: `mpesa:${request.id}`,
+  });
+}
+
+/**
+ * Post a till/paybill payment as a customer paying down their deni. Keyed by
+ * Safaricom's receipt, so the same payment can never be posted twice.
+ */
+export async function postC2bCustomerPayment(tx: Tx, c2b: C2bTransaction, customerId: string, byUserId: string | null) {
+  const actor: Actor = { id: byUserId, role: 'system', shopId: c2b.shopId };
+  await assertCustomer(tx, actor, customerId);
+  return insertEntry(tx, actor, {
+    kind: 'customer_payment',
+    businessDate: c2b.businessDate,
+    occurredAt: c2b.transTime,
+    amountCents: c2b.amountCents,
+    paymentMethod: 'mpesa',
+    customerId,
+    note: `M-Pesa ${c2b.transId} (paid to till)`,
+    idempotencyKey: `c2b:${c2b.transId}`,
   });
 }

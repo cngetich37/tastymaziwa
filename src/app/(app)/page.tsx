@@ -9,10 +9,12 @@ import {
   HandCoins,
   Lock,
   Receipt,
+  Smartphone,
   TrendingUp,
   Truck,
 } from 'lucide-react';
 import { ModuleLauncher, NeedsAttention, type AttentionItem } from '@/components/workspace';
+import { countUnmatchedC2b } from '@/server/mpesa/c2b';
 import { budgetStatus, monthRange } from '@/lib/calc/finance';
 import { Button } from '@/components/ui/button';
 import { EntryList } from '@/components/entry-list';
@@ -153,13 +155,14 @@ export default async function DashboardPage() {
   }
 
   const month = monthRange(undefined, dash.today);
-  const [recent, suppliers, closesToCheck, stock, outstanding, expenses] = await Promise.all([
+  const [recent, suppliers, closesToCheck, stock, outstanding, expenses, tillInbox] = await Promise.all([
     listEntries(db, user.shopId, { limit: 8 }),
     listSuppliers(db, user.shopId),
     listShiftCloses(db, user.shopId, { status: 'submitted' }),
     getStockLevels(db, user.shopId),
     getOutstandingCredit(db, user.shopId, dash.today),
     getExpenseBreakdown(db, user.shopId, month.from, month.to),
+    countUnmatchedC2b(db, user.shopId),
   ]);
 
   // One list of everything waiting on the owner.
@@ -171,6 +174,15 @@ export default async function DashboardPage() {
       tone: 'warning',
       text: `${closesToCheck.length} shift close${closesToCheck.length === 1 ? '' : 's'} to sign off`,
       detail: closesToCheck.map((c) => c.closedByName).join(', '),
+    });
+  }
+  if (tillInbox.count > 0) {
+    attention.push({
+      href: '/mpesa/reconcile',
+      icon: Smartphone,
+      tone: 'warning',
+      text: `${tillInbox.count} M-Pesa payment${tillInbox.count === 1 ? '' : 's'} to match`,
+      detail: `${formatKES(tillInbox.cents)} arrived on the till but isn't in the books yet`,
     });
   }
   const overdue = new Map<string, { name: string; cents: number }>();

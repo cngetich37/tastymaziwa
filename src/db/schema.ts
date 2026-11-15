@@ -588,6 +588,9 @@ export const mpesaSettings = pgTable('mpesa_settings', {
   consumerKeyEnc: text('consumer_key_enc').notNull(),
   consumerSecretEnc: text('consumer_secret_enc').notNull(),
   passkeyEnc: text('passkey_enc').notNull(),
+  /** Till/paybill reconciliation (C2B): HMAC of the secret in the registered URLs. */
+  c2bTokenHash: text('c2b_token_hash'),
+  c2bRegisteredAt: timestamp('c2b_registered_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -650,6 +653,68 @@ export const mpesaRequests = pgTable(
     check(
       'mpesa_requests_success_posted',
       sql`${t.status} <> 'succeeded' or ${t.ledgerEntryId} is not null`,
+    ),
+  ],
+);
+
+export const c2bStatusEnum = pgEnum('c2b_status', [
+  'stk', // the shop's own STK prompt: already posted
+  'matched_sale', // confirms a sale a seller recorded as M-Pesa
+  'posted_payment', // posted as a customer paying their deni
+  'unmatched', // in the owner's "match this payment" inbox
+  'ignored', // not shop business (e.g. a personal transfer), with a note
+]);
+
+/**
+ * Money paid straight to the shop's till or paybill, as Safaricom confirms
+ * it (C2B). Each payment is reconciled once: linked to what the books
+ * already show, posted as a customer payment, or left for the owner.
+ */
+export const mpesaC2bTransactions = pgTable(
+  'mpesa_c2b_transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    /** Safaricom's receipt, e.g. UCB030CBG1. */
+    transId: text('trans_id').notNull().unique(),
+    transType: text('trans_type'),
+    transTime: timestamp('trans_time', { withTimezone: true }).notNull(),
+    businessDate: date('business_date').notNull(),
+    amountCents: cents('amount_cents').notNull(),
+    businessShortcode: text('business_shortcode').notNull(),
+    /** Paybill account number the customer typed (empty for tills). */
+    billRef: text('bill_ref'),
+    /** As received: a phone, a masked phone, or (live) a SHA-256 of it. */
+    msisdn: text('msisdn'),
+    payerName: text('payer_name'),
+    orgBalanceCents: cents('org_balance_cents'),
+    status: c2bStatusEnum('status').notNull(),
+    /** The likely payer, for the inbox; or who it was posted for. */
+    customerId: uuid('customer_id'),
+    /** The sale it confirms, or the payment / STK entry posted for it. */
+    ledgerEntryId: uuid('ledger_entry_id').unique(),
+    matchedBy: uuid('matched_by').references(() => users.id),
+    matchedAt: timestamp('matched_at', { withTimezone: true }),
+    note: text('note'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('mpesa_c2b_shop_date_idx').on(t.shopId, t.businessDate),
+    index('mpesa_c2b_shop_status_idx').on(t.shopId, t.status),
+    foreignKey({
+      name: 'mpesa_c2b_customer_same_shop_fk',
+      columns: [t.customerId, t.shopId],
+      foreignColumns: [customers.id, customers.shopId],
+    }),
+    foreignKey({
+      name: 'mpesa_c2b_ledger_same_shop_fk',
+      columns: [t.ledgerEntryId, t.shopId],
+      foreignColumns: [ledgerEntries.id, ledgerEntries.shopId],
+    }),
+    check('mpesa_c2b_positive', sql`${t.amountCents} > 0`),
+    check(
+      'mpesa_c2b_linked',
+      sql`(${t.status} in ('unmatched', 'ignored')) = (${t.ledgerEntryId} is null)`,
     ),
   ],
 );
@@ -722,6 +787,7 @@ export type Employee = typeof employees.$inferSelect;
 export type PayType = (typeof payTypeEnum.enumValues)[number];
 export type MpesaSettings = typeof mpesaSettings.$inferSelect;
 export type MpesaRequest = typeof mpesaRequests.$inferSelect;
+export type C2bTransaction = typeof mpesaC2bTransactions.$inferSelect;
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
 export type AuthTokenPurpose = (typeof authTokenPurposeEnum.enumValues)[number];

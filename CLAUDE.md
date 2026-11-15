@@ -62,7 +62,9 @@ src/
     auth-actions.ts   signed-out server actions (definePublicAction): sign-up, codes, reset
     api/auth/         Auth.js handlers
     api/cron/         bill-subscriptions (Bearer CRON_SECRET), for a scheduler
-    api/mpesa/        callback/[id]/[token]: Safaricom STK Push results (per-request secret)
+    api/payments/     stk/[id]/[token]: STK Push results (per-request secret);
+                      c2b/[shopId]/[token]/confirm|validate: till/paybill payments (per-shop secret).
+                      No "mpesa" in these paths (Daraja drops such URLs). api/mpesa/ is the old STK path.
   db/
     schema.ts         single source of truth for tables → `npm run db:generate`
     client.ts         createDb/migrateDb (usable from scripts and tests)
@@ -77,7 +79,8 @@ src/
     auth/             accounts.ts (all auth flows), tokens.ts (codes/links),
                       rate-limit.ts, mailer.ts, emails.ts, config.ts
     mpesa/            daraja.ts (Daraja client, fetch injectable), crypto.ts (credential
-                      encryption, callback secrets), payments.ts (prompts, callback, status)
+                      encryption, callback secrets), payments.ts (prompts, callback, status),
+                      c2b.ts (till reconciliation: confirmations, matching, inbox)
     users.ts, password.ts
   lib/                isomorphic and pure: safe on the client
     money.ts          cents/millilitre parsing, line totals, formatting

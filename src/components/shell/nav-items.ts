@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Milk,
   Receipt,
+  Scale,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -49,6 +50,7 @@ export const SUPPLIERS: NavItem = { href: '/suppliers', label: 'Suppliers', icon
 export const PAY_SUPPLIERS: NavItem = { href: '/suppliers/pay', label: 'Pay suppliers', icon: Wallet };
 export const EXPENSES: NavItem = { href: '/expenses', label: 'Expenses', icon: Receipt };
 export const MPESA: NavItem = { href: '/mpesa', label: 'M-Pesa', icon: Smartphone };
+export const RECONCILE: NavItem = { href: '/mpesa/reconcile', label: 'Reconcile', icon: Scale };
 export const INVENTORY: NavItem = { href: '/inventory', label: 'Stock & products', icon: Boxes };
 export const LEDGER: NavItem = { href: '/ledger', label: 'Ledger', icon: BookOpen };
 export const STAFF_PAGE: NavItem = { href: '/staff', label: 'Staff', icon: Contact };
@@ -65,7 +67,7 @@ const MODULES: NavGroup[] = [
   { id: 'sales', label: 'Sales', icon: ShoppingCart, items: [SALES, CUSTOMERS] },
   { id: 'purchasing', label: 'Purchasing', icon: Truck, items: [DELIVERIES, SUPPLIERS, PAY_SUPPLIERS] },
   { id: 'inventory', label: 'Inventory', icon: Boxes, items: [INVENTORY] },
-  { id: 'finance', label: 'Finance', icon: BookOpen, items: [EXPENSES, MPESA, LEDGER] },
+  { id: 'finance', label: 'Finance', icon: BookOpen, items: [EXPENSES, MPESA, RECONCILE, LEDGER] },
   { id: 'people', label: 'People', icon: Contact, items: [STAFF_PAGE, PAYROLL] },
   { id: 'insights', label: 'Insights', icon: ChartColumn, items: [REPORTS] },
   { id: 'admin', label: 'Admin', icon: ShieldCheck, items: [SETTINGS] },

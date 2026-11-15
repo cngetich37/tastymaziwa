@@ -3,7 +3,7 @@
  *
  * 1. `startMpesaSale` / `startMpesaCustomerPayment` price the sale by the
  *    usual rules, store a pending request, and send the PIN prompt.
- * 2. Safaricom POSTs the outcome to `/api/mpesa/callback/<id>/<secret>`;
+ * 2. Safaricom POSTs the outcome to `/api/payments/stk/<id>/<secret>`;
  *    `handleMpesaCallback` checks the secret, the CheckoutRequestID and the
  *    amount, then posts the sale/payment to the ledger once.
  * 3. If the callback never comes, `refreshMpesaRequest` asks Daraja.
@@ -195,7 +195,8 @@ async function send(
       {
         amountShillings: request.amountCents / 100,
         phone: request.phone,
-        callbackUrl: `${appUrl()}/api/mpesa/callback/${request.id}/${token}`,
+        // No "mpesa" in the path: Daraja is reported to drop such callback URLs.
+        callbackUrl: `${appUrl()}/api/payments/stk/${request.id}/${token}`,
         accountReference,
         description: request.purpose === 'sale' ? 'Milk' : 'Payment',
       },

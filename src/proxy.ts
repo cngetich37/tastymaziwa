@@ -25,6 +25,6 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Skip auth endpoints, cron (bearer token), M-Pesa callbacks (per-request secret) and static assets.
-  matcher: ['/((?!api/auth|api/cron|api/mpesa|_next/static|_next/image|favicon.ico).*)'],
+  // Skip auth endpoints, cron (bearer token), M-Pesa callbacks (per-request / per-shop secrets) and static assets.
+  matcher: ['/((?!api/auth|api/cron|api/mpesa|api/payments|_next/static|_next/image|favicon.ico).*)'],
 };

@@ -268,6 +268,16 @@ export const mpesaCustomerPaymentSchema = z.object({
 
 export const mpesaRequestIdSchema = z.object({ requestId: id });
 
+// Till / paybill reconciliation (C2B)
+export const connectTillSchema = z.object({});
+export const simulateTillPaymentSchema = z.object({ amount: kesField(), phone: requiredPhone });
+export const c2bToCustomerSchema = z.object({ c2bId: id, customerId: id });
+export const c2bToSaleSchema = z.object({ c2bId: id, entryId: id });
+export const c2bIgnoreSchema = z.object({
+  c2bId: id,
+  note: z.string().trim().min(3, 'Say what it was, e.g. "Personal transfer"').max(200),
+});
+
 // --- shift close ------------------------------------------------------------------
 
 const countField = (label: string) => scaledField(kesToCents, label, { allowZero: true });

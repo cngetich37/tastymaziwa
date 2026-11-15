@@ -218,3 +218,90 @@ export function parseStkCallback(body: unknown): StkCallback | null {
     phone: phone != null ? String(phone) : null,
   };
 }
+
+// --- C2B: payments made straight to the till / paybill ----------------------------------
+
+/**
+ * Register where Safaricom sends till/paybill payments (C2B v2). Done once per
+ * shortcode; registering again replaces the URLs. "Completed" means payments
+ * still go through if our validation URL is down.
+ */
+export async function registerC2bUrls(
+  c: DarajaCredentials,
+  urls: { confirmationUrl: string; validationUrl: string },
+  fetchImpl: Fetch = fetch,
+) {
+  const { ok, body } = await post<{ ResponseCode?: string; ResponseDescription?: string; errorMessage?: string }>(
+    c,
+    '/mpesa/c2b/v2/registerurl',
+    {
+      ShortCode: c.businessShortcode,
+      ResponseType: 'Completed',
+      ConfirmationURL: urls.confirmationUrl,
+      ValidationURL: urls.validationUrl,
+    },
+    fetchImpl,
+  );
+  const code = body?.ResponseCode;
+  if (!ok || (code !== undefined && code !== '0' && code !== '00000000')) {
+    throw new DarajaError(body?.errorMessage ?? body?.ResponseDescription ?? 'M-Pesa did not register the till');
+  }
+}
+
+/** Sandbox only: make a pretend customer payment to the shortcode, to test reconciliation. */
+export async function simulateC2b(
+  c: DarajaCredentials,
+  input: { amountShillings: number; phone: string; billRef: string },
+  fetchImpl: Fetch = fetch,
+) {
+  if (c.environment !== 'sandbox') throw new DarajaError('Test payments only work in sandbox mode');
+  const { ok, body } = await post<{ ResponseCode?: string; ResponseDescription?: string; errorMessage?: string }>(
+    c,
+    '/mpesa/c2b/v1/simulate',
+    {
+      ShortCode: c.businessShortcode,
+      CommandID: c.shortcodeType === 'till' ? 'CustomerBuyGoodsOnline' : 'CustomerPayBillOnline',
+      Amount: input.amountShillings,
+      Msisdn: darajaPhone(input.phone),
+      BillRefNumber: c.shortcodeType === 'till' ? '' : input.billRef,
+    },
+    fetchImpl,
+  );
+  if (!ok || (body?.ResponseCode !== undefined && body.ResponseCode !== '0')) {
+    throw new DarajaError(body?.errorMessage ?? body?.ResponseDescription ?? 'M-Pesa did not accept the test payment');
+  }
+}
+
+export interface C2bConfirmation {
+  transId: string;
+  transType: string | null;
+  transTime: string | null;
+  amount: unknown;
+  businessShortcode: string;
+  billRef: string | null;
+  msisdn: string | null;
+  payerName: string | null;
+  orgBalance: unknown;
+}
+
+/** Read a C2B confirmation body; null unless it has the fields that matter. */
+export function parseC2bConfirmation(body: unknown): C2bConfirmation | null {
+  const b = body as Record<string, unknown> | null;
+  if (!b || typeof b !== 'object') return null;
+  const str = (k: string) => (b[k] === undefined || b[k] === null ? null : String(b[k]).trim() || null);
+  const transId = str('TransID');
+  const shortcode = str('BusinessShortCode');
+  if (!transId || !/^[A-Z0-9]{6,20}$/.test(transId) || !shortcode) return null;
+  const name = ['FirstName', 'MiddleName', 'LastName'].map(str).filter(Boolean).join(' ');
+  return {
+    transId,
+    transType: str('TransactionType'),
+    transTime: str('TransTime'),
+    amount: b.TransAmount,
+    businessShortcode: shortcode,
+    billRef: str('BillRefNumber'),
+    msisdn: str('MSISDN'),
+    payerName: name ? name.slice(0, 80) : null,
+    orgBalance: b.OrgAccountBalance,
+  };
+}
