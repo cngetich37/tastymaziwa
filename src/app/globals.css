@@ -53,6 +53,10 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  --color-brand: hsl(var(--brand));
+  --color-brand-milk: hsl(var(--brand-milk));
+  --color-butter: hsl(var(--butter));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -105,82 +109,89 @@
 }
 
 @utility gradient-text {
-  @apply bg-clip-text text-transparent bg-linear-to-r from-primary to-blue-500;
+  @apply bg-clip-text text-transparent bg-linear-to-r from-primary to-butter;
 }
 
 @layer base {
   /*
-    A calm, neutral ERP palette: grey canvas, white surfaces, one emerald
-    brand colour. Text on primary meets WCAG AA in both themes.
+    "Fresh milk": a warm cream canvas, milk-white cards, dairy-blue brand and
+    a butter-yellow highlight. Blue (not green) for the brand keeps green free
+    to mean money in / paid. Text on primary meets WCAG AA in both themes
+    (7.0:1 light, 8.2:1 dark). Hex copies live in src/lib/brand.ts.
   */
   :root {
-    --background: 220 20% 97%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --background: 42 40% 97%;
+    --foreground: 218 48% 14%;
+    --card: 45 60% 99.6%;
+    --card-foreground: 218 48% 14%;
+    --popover: 45 60% 99.6%;
+    --popover-foreground: 218 48% 14%;
 
-    --primary: 161 84% 26%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 213 82% 37%;
+    --primary-foreground: 45 60% 99.6%;
 
-    --secondary: 220 14% 94%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 40 30% 93%;
+    --secondary-foreground: 218 48% 14%;
 
-    --muted: 220 14% 95%;
-    --muted-foreground: 220 9% 40%;
+    --muted: 40 28% 94%;
+    --muted-foreground: 30 8% 38%;
 
-    --accent: 161 50% 95%;
-    --accent-foreground: 161 84% 20%;
+    --accent: 210 80% 95%;
+    --accent-foreground: 213 82% 30%;
 
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 89%;
-    --input: 220 13% 85%;
-    --ring: 161 84% 32%;
+    --border: 38 22% 87%;
+    --input: 38 18% 81%;
+    --ring: 213 82% 45%;
 
     --radius: 0.625rem;
 
-    --chart-1: 161 84% 32%;
-    --chart-2: 32 90% 50%;
-    --chart-3: 210 80% 50%;
-    --chart-4: 270 60% 58%;
-    --chart-5: 345 75% 52%;
+    --chart-1: 213 82% 42%;
+    --chart-2: 41 92% 50%;
+    --chart-3: 158 55% 36%;
+    --chart-4: 14 72% 54%;
+    --chart-5: 265 45% 58%;
+
+    /* The logo's fixed colours: the same in both themes. */
+    --brand: 213 82% 37%;
+    --brand-milk: 45 60% 99.6%;
+    --butter: 41 92% 54%;
   }
 
   .dark {
-    --background: 222 30% 7%;
-    --foreground: 210 30% 96%;
-    --card: 222 28% 10%;
-    --card-foreground: 210 30% 96%;
-    --popover: 222 28% 11%;
-    --popover-foreground: 210 30% 96%;
+    --background: 220 40% 7%;
+    --foreground: 42 40% 94%;
+    --card: 220 36% 10%;
+    --card-foreground: 42 40% 94%;
+    --popover: 220 36% 11%;
+    --popover-foreground: 42 40% 94%;
 
-    --primary: 158 64% 52%;
-    --primary-foreground: 165 90% 8%;
+    --primary: 210 95% 70%;
+    --primary-foreground: 218 70% 10%;
 
-    --secondary: 220 20% 16%;
-    --secondary-foreground: 210 30% 96%;
+    --secondary: 220 26% 16%;
+    --secondary-foreground: 42 40% 94%;
 
-    --muted: 220 20% 15%;
-    --muted-foreground: 218 14% 68%;
+    --muted: 220 26% 15%;
+    --muted-foreground: 40 12% 68%;
 
-    --accent: 160 40% 14%;
-    --accent-foreground: 158 64% 70%;
+    --accent: 214 50% 16%;
+    --accent-foreground: 210 95% 78%;
 
     --destructive: 0 62% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 18% 18%;
-    --input: 220 18% 24%;
-    --ring: 158 64% 52%;
+    --border: 220 24% 18%;
+    --input: 220 22% 24%;
+    --ring: 210 95% 70%;
 
-    --chart-1: 158 64% 52%;
-    --chart-2: 32 90% 58%;
-    --chart-3: 210 85% 62%;
-    --chart-4: 270 70% 70%;
-    --chart-5: 345 80% 64%;
+    --chart-1: 210 95% 68%;
+    --chart-2: 41 92% 60%;
+    --chart-3: 158 55% 52%;
+    --chart-4: 14 80% 64%;
+    --chart-5: 265 60% 72%;
   }
 }
 

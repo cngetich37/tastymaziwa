@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { PwaRegister } from '@/components/pwa';
 import { ThemeProvider } from '@/components/theme-provider';
+import { BRAND } from '@/lib/brand';
 
 // Self-hosted at build time: no request to Google on the shop's data bundle.
 const inter = Inter({
@@ -27,8 +28,8 @@ export const viewport: Viewport = {
   // Android: the keyboard shrinks the layout, so bottom sheets and the Save button stay above it.
   interactiveWidget: 'resizes-content',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f6f7f9' },
-    { media: '(prefers-color-scheme: dark)', color: '#0d111a' },
+    { media: '(prefers-color-scheme: light)', color: BRAND.cream },
+    { media: '(prefers-color-scheme: dark)', color: BRAND.midnight },
   ],
 };
 

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { BRAND } from '@/lib/brand';
 
 /**
  * Web app manifest: what makes TastyMaziwa installable on a phone's home
@@ -15,8 +16,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#f6f7f9',
-    theme_color: '#0b7a58',
+    background_color: BRAND.cream,
+    theme_color: BRAND.blue,
     categories: ['business', 'finance', 'productivity'],
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

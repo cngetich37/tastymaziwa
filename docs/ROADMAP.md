@@ -29,6 +29,7 @@ Mark each item done with `[x]` as it ships.
 
 - [x] **Role workspaces.** Owner Today is a workspace: "Needs your attention" (closes to sign off, late debtors, low stock, over-budget categories) and, on phones, a module launcher. Desktop sidebar rows are compact; the phone menu keeps 44px targets.
 - [x] **ERP redesign, step 1.** Inter, a calmer neutral palette with an accessible emerald brand colour, tabular figures. Navigation by module (Counter, Sales, Purchasing, Inventory, Finance, Insights) with a tab bar per module (`ModuleTabs`). `DataTable`: a table on tablets and up, stacked cards on phones.
+- [x] **Brand refresh: "fresh milk".** A cream canvas, milk-white cards, a dairy-blue brand colour and a butter-yellow highlight (AA contrast in both themes). With blue as the brand, green only means money in or paid. The new logo is a milk churn with a wave of milk across it (`lib/brand.ts`, which also feeds the icons, manifest and emails).
 
 - [x] **Sidebar navigation.** On desktop, a left sidebar holds the shop, a **Record** button, nav groups (Shop / Manage), the theme and the account menu. It collapses to an icon rail (Ctrl+B), and the server remembers the state in a cookie. On phones, a bottom tab bar (Today, Ledger, raised **Record**, Credit, Menu) keeps navigation in thumb reach, and Menu slides out the full sidebar.
 - [x] **Record from anywhere.** One dialog covers every ledger entry ("What happened?" then the form). The layout loads the customer and supplier pickers once, so it works on every page.

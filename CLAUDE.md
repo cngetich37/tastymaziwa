@@ -158,7 +158,7 @@ The database enforces these rules. Don't work around them:
 
 ## Installable app (PWA)
 
-- `app/manifest.ts` is the manifest; icons in `public/icons` come from `scripts/make-icons.mts` (rerun it if the logo or brand colour changes).
+- `app/manifest.ts` is the manifest; icons in `public/icons` come from `scripts/make-icons.mts` (rerun it if the logo or brand colours in `lib/brand.ts` change).
 - `public/sw.js` is registered by `PwaRegister` (root layout, production only) as `/sw.js?v=<NEXT_PUBLIC_BUILD_ID>`, so each deploy gets a fresh worker and cache. It caches **only** `/_next/static`, icons and the `/offline` page. Never make it cache page HTML, RSC payloads, `/api` or anything holding shop data.
 - The manifest, `sw.js`, icons and `/offline` must stay reachable signed out (see the matcher and `PUBLIC_PATHS` in `src/proxy.ts`).
 

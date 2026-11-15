@@ -1,13 +1,14 @@
 /** Email templates: short, plain, readable on a phone notification. */
+import { BRAND } from '@/lib/brand';
 import type { Email } from './mailer';
 
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 function layout(body: string): string {
-  return `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f7f9;font-family:Arial,Helvetica,sans-serif;color:#111827">
+  return `<!doctype html><html><body style="margin:0;padding:24px;background:${BRAND.cream};font-family:Arial,Helvetica,sans-serif;color:${BRAND.ink}">
 <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;padding:24px">
-<p style="margin:0 0 16px;font-size:18px;font-weight:bold">🥛 TastyMaziwa</p>
+<p style="margin:0 0 16px;font-size:18px;font-weight:bold;color:${BRAND.blue}">🥛 TastyMaziwa</p>
 ${body}
 <p style="margin:24px 0 0;font-size:12px;color:#6b7280">If you didn't ask for this, you can ignore this email — nothing will change.</p>
 </div></body></html>`;
@@ -17,7 +18,7 @@ const codeBlock = (code: string) =>
   `<p style="margin:16px 0;font-size:32px;font-weight:bold;letter-spacing:8px;font-family:monospace">${code}</p>`;
 
 const button = (href: string, label: string) =>
-  `<p style="margin:20px 0"><a href="${esc(href)}" style="background:#16a34a;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">${esc(label)}</a></p>`;
+  `<p style="margin:20px 0"><a href="${esc(href)}" style="background:${BRAND.blue};color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">${esc(label)}</a></p>`;
 
 export function signupCodeEmail(to: string, code: string, minutes: number): Email {
   return {
