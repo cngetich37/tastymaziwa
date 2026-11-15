@@ -33,9 +33,11 @@ export function Avatar({ name, className }: { name: string; className?: string }
   );
 }
 
-const rowClass = (active: boolean, collapsed: boolean) =>
+/** `dense`: the desktop sidebar (mouse); the phone menu keeps 44px tap targets. */
+const rowClass = (active: boolean, collapsed: boolean, dense = false) =>
   cn(
-    'flex h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+    dense ? 'h-9' : 'h-11',
+    'flex w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
     active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
     collapsed && 'justify-center px-0',
   );
@@ -51,6 +53,7 @@ export function SidebarBody({
   onToggle,
   onNavigate,
   showRecord = true,
+  dense = false,
 }: {
   user: ShellUser;
   shopName: string;
@@ -58,6 +61,7 @@ export function SidebarBody({
   onToggle?: () => void;
   onNavigate?: () => void;
   showRecord?: boolean;
+  dense?: boolean;
 }) {
   const pathname = usePathname();
   const label = (text: string) => <span className={cn('truncate', collapsed && 'sr-only')}>{text}</span>;
@@ -92,7 +96,7 @@ export function SidebarBody({
 
       <nav aria-label="Main" className={cn('flex-1 overflow-y-auto px-3 py-2', collapsed && 'px-2')}>
         {navGroupsFor(user.role).map((group) => (
-          <div key={group.label} className="mb-4">
+          <div key={group.label} className={dense ? 'mb-2' : 'mb-4'}>
             <p
               className={cn(
                 'px-3 pb-1 text-xs font-semibold tracking-wider text-muted-foreground/80 uppercase',
@@ -111,7 +115,7 @@ export function SidebarBody({
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
                       title={collapsed ? text : undefined}
-                      className={rowClass(active, collapsed)}
+                      className={rowClass(active, collapsed, dense)}
                     >
                       <Icon className="size-5 shrink-0" aria-hidden />
                       {label(text)}
@@ -131,7 +135,7 @@ export function SidebarBody({
           onClick={onNavigate}
           aria-current={isActive(pathname, '/account') ? 'page' : undefined}
           title={collapsed ? 'Your account' : undefined}
-          className={cn(rowClass(isActive(pathname, '/account'), collapsed), 'h-14')}
+          className={cn(rowClass(isActive(pathname, '/account'), collapsed, dense), dense ? 'h-12' : 'h-14')}
         >
           <Avatar name={user.name} />
           <span className={cn('min-w-0 text-left', collapsed && 'sr-only')}>
@@ -143,7 +147,7 @@ export function SidebarBody({
           type="button"
           onClick={() => signOut({ redirectTo: '/login' })}
           title={collapsed ? 'Sign out' : undefined}
-          className={rowClass(false, collapsed)}
+          className={rowClass(false, collapsed, dense)}
         >
           <LogOut className="size-5 shrink-0" aria-hidden />
           {label('Sign out')}
@@ -153,7 +157,7 @@ export function SidebarBody({
             type="button"
             onClick={onToggle}
             title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Ctrl+B)`}
-            className={rowClass(false, collapsed)}
+            className={rowClass(false, collapsed, dense)}
           >
             {collapsed ? (
               <PanelLeftOpen className="size-5 shrink-0" aria-hidden />
@@ -207,7 +211,7 @@ export function DesktopSidebar({
         collapsed ? 'w-[4.5rem]' : 'w-64',
       )}
     >
-      <SidebarBody user={user} shopName={shopName} collapsed={collapsed} onToggle={toggle} />
+      <SidebarBody user={user} shopName={shopName} collapsed={collapsed} onToggle={toggle} dense />
     </aside>
   );
 }

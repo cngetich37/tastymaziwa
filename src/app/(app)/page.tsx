@@ -1,5 +1,19 @@
 import Link from 'next/link';
-import { Banknote, CheckCircle2, Circle, ClipboardCheck, Droplet, HandCoins, Lock, TrendingUp, Truck } from 'lucide-react';
+import {
+  AlertTriangle,
+  Banknote,
+  CheckCircle2,
+  Circle,
+  ClipboardCheck,
+  Droplet,
+  HandCoins,
+  Lock,
+  Receipt,
+  TrendingUp,
+  Truck,
+} from 'lucide-react';
+import { ModuleLauncher, NeedsAttention, type AttentionItem } from '@/components/workspace';
+import { budgetStatus, monthRange } from '@/lib/calc/finance';
 import { Button } from '@/components/ui/button';
 import { EntryList } from '@/components/entry-list';
 import { PageHeader } from '@/components/page-header';
@@ -13,7 +27,17 @@ import { getDb } from '@/db';
 import { formatLongDate } from '@/lib/dates';
 import { formatKES, formatLitres } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { getDashboard, getShop, listDeliverySubmissions, listEntries, listShiftCloses, listSuppliers } from '@/server/queries';
+import {
+  getDashboard,
+  getExpenseBreakdown,
+  getOutstandingCredit,
+  getShop,
+  getStockLevels,
+  listDeliverySubmissions,
+  listEntries,
+  listShiftCloses,
+  listSuppliers,
+} from '@/server/queries';
 import { requireUser } from '@/server/session';
 
 const salesDetail = (t: { salesMl: number; cashSalesCents: number; mpesaSalesCents: number; creditSalesCents: number }) =>
@@ -128,40 +152,69 @@ export default async function DashboardPage() {
     );
   }
 
-  const [recent, suppliers, closesToCheck] = await Promise.all([
+  const month = monthRange(undefined, dash.today);
+  const [recent, suppliers, closesToCheck, stock, outstanding, expenses] = await Promise.all([
     listEntries(db, user.shopId, { limit: 8 }),
     listSuppliers(db, user.shopId),
     listShiftCloses(db, user.shopId, { status: 'submitted' }),
+    getStockLevels(db, user.shopId),
+    getOutstandingCredit(db, user.shopId, dash.today),
+    getExpenseBreakdown(db, user.shopId, month.from, month.to),
   ]);
+
+  // One list of everything waiting on the owner.
+  const attention: AttentionItem[] = [];
+  if (closesToCheck.length > 0) {
+    attention.push({
+      href: '/close',
+      icon: ClipboardCheck,
+      tone: 'warning',
+      text: `${closesToCheck.length} shift close${closesToCheck.length === 1 ? '' : 's'} to sign off`,
+      detail: closesToCheck.map((c) => c.closedByName).join(', '),
+    });
+  }
+  const overdue = new Map<string, { name: string; cents: number }>();
+  for (const s of outstanding.filter((o) => o.daysOverdue > 0)) {
+    const row = overdue.get(s.customerId) ?? { name: s.customerName, cents: 0 };
+    row.cents += s.outstandingCents;
+    overdue.set(s.customerId, row);
+  }
+  if (overdue.size > 0) {
+    const cents = [...overdue.values()].reduce((n, o) => n + o.cents, 0);
+    attention.push({
+      href: '/reports?type=debtors',
+      icon: HandCoins,
+      tone: 'danger',
+      text: `${overdue.size} customer${overdue.size === 1 ? '' : 's'} late paying ${formatKES(cents)}`,
+      detail: [...overdue.values()].map((o) => o.name).slice(0, 4).join(', '),
+    });
+  }
+  const low = stock.filter((l) => l.low);
+  if (low.length > 0) {
+    attention.push({
+      href: '/inventory',
+      icon: AlertTriangle,
+      tone: 'warning',
+      text: `${low.length} item${low.length === 1 ? '' : 's'} low on stock`,
+      detail: low.map((l) => l.name).join(', '),
+    });
+  }
+  const overBudget = [...expenses.budgets].filter(
+    ([category, budget]) => budgetStatus(expenses.spent.get(category) ?? 0, budget).state === 'over',
+  );
+  if (overBudget.length > 0) {
+    attention.push({
+      href: '/expenses',
+      icon: Receipt,
+      tone: 'danger',
+      text: `Over budget on ${overBudget.length} expense categor${overBudget.length === 1 ? 'y' : 'ies'}`,
+      detail: overBudget.map(([c]) => c.replace(/_/g, ' ')).join(', '),
+    });
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageHeader
-        title="Today"
-        description={formatLongDate(dash.today)}
-        actions={
-          <Button asChild variant="outline" className="h-11 gap-2">
-            <Link href="/close">
-              <ClipboardCheck className="size-4" aria-hidden /> Close shift
-            </Link>
-          </Button>
-        }
-      />
-
-      {closesToCheck.length > 0 && (
-        <Link
-          href="/close"
-          className="flex min-h-11 items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm hover:bg-amber-500/10"
-        >
-          <ClipboardCheck className="size-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-          <span>
-            <strong>
-              {closesToCheck.length} shift close{closesToCheck.length === 1 ? '' : 's'}
-            </strong>{' '}
-            to check and sign off
-          </span>
-        </Link>
-      )}
+      <PageHeader title="Today" description={formatLongDate(dash.today)} />
 
       <SetupChecklist
         steps={[
@@ -178,6 +231,10 @@ export default async function DashboardPage() {
       <PendingDeliveriesCard deliveries={pending} today={dash.today} />
 
       <QuickActions />
+
+      <NeedsAttention items={attention} />
+
+      <ModuleLauncher role={user.role} />
 
       {dash.activeSubscriptions > 0 && (
         <div className="flex flex-wrap items-center gap-3">

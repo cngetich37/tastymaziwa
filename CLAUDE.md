@@ -51,8 +51,11 @@ npm run db:studio      # browse the database
 ```
 src/
   app/
-    (app)/            shop pages (owner + seller): / (Today), /sales, /deliveries (per day, ?date= for owners),
-                      /customers[/id], /suppliers[/id], /ledger, /reports, /settings (owner), /account
+    (app)/            shop pages, grouped into ERP modules (components/shell/nav-items.ts):
+                      Counter: / (Today), /close · Sales: /sales, /customers[/id[/statement]]
+                      Purchasing: /deliveries, /suppliers[/id[/statement]], /suppliers/pay
+                      Inventory: /inventory · Finance: /expenses, /ledger · People: /staff, /payroll
+                      Insights: /reports · Admin: /settings · /account
     (supplier)/       a supplier login's own pages: /supply (record deliveries), /supply/account
     (auth)/           signed-out pages: /login, /signup, /forgot-password, /reset-password
     actions.ts        signed-in server actions, each wrapped in defineAction
@@ -82,6 +85,9 @@ src/
     validation.ts     Zod schemas + Kenyan phone normalisation
   components/
     forms/            entry-forms.tsx (all forms), fields.tsx, use-action-form.ts
+    data-table.tsx    ERP list: a table from tablet width, stacked cards on phones (use it for lists)
+    workspace.tsx     NeedsAttention (owner alerts) and ModuleLauncher (phone module tiles)
+    shell/            sidebar (by module), module-tabs.tsx, mobile tab bar, record dialog
 drizzle/              generated SQL migrations (commit them; never edit applied ones)
 e2e/                  Playwright specs
 scripts/              seed, migrate (run with tsx)
@@ -89,7 +95,7 @@ scripts/              seed, migrate (run with tsx)
 
 ## Multi-tenancy: every row belongs to a shop
 
-`shops` is the tenant. `users`, `customers`, `suppliers`, `subscriptions`, `ledger_entries`, `delivery_submissions` and `audit_log` all have `shop_id`. **This is the rule that must never break: one shop must never see or change another shop's data.**
+`shops` is the tenant. Every business table (`users`, `customers`, `suppliers`, `products`, `subscriptions`, `ledger_entries`, `delivery_submissions`, `shift_closes`, `expense_budgets`, `employees`, `attendance`, `employee_advances`, `payroll_runs`, `payroll_lines`, `audit_log`) has `shop_id`. **This is the rule that must never break: one shop must never see or change another shop's data.**
 
 - **Every query filters by `shopId`, and every insert sets it.** Services get it from `actor.shopId`; queries take `shopId` as their second argument. Take it from the session (`requireUser()` / `defineAction`), **never from client input**.
 - **Look up by id *and* shop:** `where(and(eq(t.id, id), eq(t.shopId, actor.shopId)))`. A bare `eq(t.id, id)` on a client-supplied id is a cross-tenant bug.
@@ -126,7 +132,9 @@ Security rules for auth code:
 | `customer_payment` | customer pays down credit (`cash`/`mpesa`) | in |
 | `supplier_payment` | shop pays the milkman | out |
 | `expense` | operating cost, with `expense_category` | out |
-| `spoilage` | milk written off (volume only) | — |
+| `spoilage` | milk (or a product) written off (volume only) | — |
+
+`product_id` null = fresh milk; otherwise `volume_ml` is thousandths of the product's unit (ml, milli-pieces, grams). Money totals include every product; litres and milk stock are milk-only (`isMilk` in `lib/calc/summary.ts`). Wages (advances and payroll) are `expense` rows with category `wages`; expenses record `payment_method` so the shift close can count cash and M-Pesa.
 
 The derived figures (see `src/lib/calc/summary.ts`):
 - **Stock on hand** = delivered − sold − spoiled (all time).

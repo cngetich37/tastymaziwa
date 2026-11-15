@@ -27,6 +27,7 @@ Mark each item done with `[x]` as it ships.
 
 ## UX: app shell and forms
 
+- [x] **Role workspaces.** Owner Today is a workspace: "Needs your attention" (closes to sign off, late debtors, low stock, over-budget categories) and, on phones, a module launcher. Desktop sidebar rows are compact; the phone menu keeps 44px targets.
 - [x] **ERP redesign, step 1.** Inter, a calmer neutral palette with an accessible emerald brand colour, tabular figures. Navigation by module (Counter, Sales, Purchasing, Inventory, Finance, Insights) with a tab bar per module (`ModuleTabs`). `DataTable`: a table on tablets and up, stacked cards on phones.
 
 - [x] **Sidebar navigation.** On desktop, a left sidebar holds the shop, a **Record** button, nav groups (Shop / Manage), the theme and the account menu. It collapses to an icon rail (Ctrl+B), and the server remembers the state in a cookie. On phones, a bottom tab bar (Today, Ledger, raised **Record**, Credit, Menu) keeps navigation in thumb reach, and Menu slides out the full sidebar.
