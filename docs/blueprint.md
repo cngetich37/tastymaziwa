@@ -4,10 +4,13 @@
 
 - Milk Delivery Input: Record daily milk delivery from the milkman in liters.
 - Milk Sales Input: Record daily milk sales in liters and price per liter.
-- Credit Sales Recording: Record milk sold on credit with expected payment date.
-- Profit/Loss Calculation: Calculate daily, weekly, and monthly profit/loss based on delivery, sales, and credit data.
+- Credit & Customer Management: Record milk sold on credit, track individual customer profiles, log partial payments, and monitor expected payment dates.
+- Inventory & Wastage Tracking: Automatically calculate unsold milk at the end of the day and log any spoilage/wastage.
+- Expense Tracking: Record daily operational expenses (e.g., transport, packaging, refrigeration) for accurate net profit calculation.
+- Profit/Loss Calculation: Calculate daily, weekly, and monthly gross and net profit/loss based on delivery, sales, expenses, spoilage, and credit data.
 - Dashboard Overview: Display a summary dashboard showing key metrics like total milk delivered, sold, credit amount, and profit/loss.
 - Amount Owed Recording: Record the amount owed to the milkman.
+- Supplier Payments: Track payments made to the milkman to maintain an accurate running balance of accounts payable.
 
 ## Style Guidelines:
 
