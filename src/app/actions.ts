@@ -12,6 +12,7 @@ import { notifyStockChange } from '@/server/notify/stock-alerts';
 import { ALL_ROLES, OWNER, STAFF, SUPPLIER, defineAction } from '@/server/action';
 import * as accounts from '@/server/auth/accounts';
 import * as ledger from '@/server/ledger';
+import * as demo from '@/server/demo/demo';
 import * as c2b from '@/server/mpesa/c2b';
 import * as mpesa from '@/server/mpesa/payments';
 import {
@@ -66,6 +67,7 @@ import {
   subscriptionStatusSchema,
   supplierPaymentSchema,
   supplierSchema,
+  demoSwitchRoleSchema,
 } from '@/lib/validation';
 
 const idOnly = <T extends { id: string }>(row: T) => ({ id: row.id });
@@ -372,4 +374,9 @@ export const setUserRoleAction = defineAction({ schema: userRoleSchema, roles: O
 
 export const resendInviteAction = defineAction({ schema: resendInviteSchema, roles: OWNER }, ({ db, actor, ip }, input) =>
   accounts.resendInvite(db, actor, input.userId, ip).then(() => null),
+);
+
+/** Demo shops only: sign in as the same demo shop's owner, seller or supplier. */
+export const demoSwitchRoleAction = defineAction({ schema: demoSwitchRoleSchema, roles: ALL_ROLES }, ({ db, actor }, input) =>
+  demo.demoSwitchToken(db, actor, input.role).then((token) => ({ token })),
 );

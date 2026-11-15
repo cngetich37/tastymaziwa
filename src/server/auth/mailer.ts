@@ -43,6 +43,11 @@ export function outboxDir(): string {
 }
 
 export async function sendEmail(email: Email): Promise<void> {
+  // Demo logins use reserved `.invalid` addresses (server/demo/guard.ts): never deliverable.
+  if (email.to.toLowerCase().endsWith('.invalid')) {
+    console.info(`[email] skipped: ${email.to} is a demo address`);
+    return;
+  }
   if (writesToOutbox()) {
     const dir = outboxDir();
     await mkdir(dir, { recursive: true });

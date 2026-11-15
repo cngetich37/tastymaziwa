@@ -70,8 +70,14 @@ export const shops = pgTable('shops', {
   salePricePerLitreCents: cents('sale_price_per_litre_cents'),
   /** E.164 WhatsApp number the owner gets stock updates on. Null = off. */
   stockAlertWhatsapp: text('stock_alert_whatsapp'),
+  /**
+   * Set only on a "Try the demo" sandbox (server/demo): when it is purged.
+   * Null = a real shop. A trigger stops a real shop ever becoming a demo,
+   * and only expired demos may have ledger/audit rows deleted.
+   */
+  demoExpiresAt: timestamp('demo_expires_at', { withTimezone: true }),
   createdAt: createdAt(),
-});
+}, (t) => [index('shops_demo_expires_idx').on(t.demoExpiresAt).where(sql`${t.demoExpiresAt} is not null`)]);
 
 const shopId = () =>
   uuid('shop_id')

@@ -22,7 +22,8 @@ npm test               # Vitest: unit tests + integration tests on in-memory Pos
 npm run test:e2e       # Playwright on a phone viewport. Run `npm run build` first.
 
 npm run db:seed        # a demo shop + verified owner (owner@example.com, password printed once)
-npm run db:seed -- --demo   # ...plus two weeks of demo trading
+npm run db:seed -- --demo   # ...instead the "Try the demo" sample shop: six weeks of trading,
+                            #    plus seller@example.com / supplier@example.com (email-code sign-in)
 npm run db:generate    # create a migration after editing src/db/schema.ts
 npm run db:migrate     # apply migrations (required for hosted Postgres)
 npm run db:studio      # browse the database
@@ -83,6 +84,9 @@ src/
                       c2b.ts (till reconciliation: confirmations, matching, inbox)
     notify/           whatsapp.ts (Cloud API template sender; dev outbox), stock-alerts.ts
                       (owner's stock updates; run from actions with after(), never in the transaction)
+    demo/             "Try the demo": demo.ts (sandbox shop per visitor, signed sign-in tokens,
+                      role switching, purge), data.ts (the sample trading), guard.ts (isDemoShop:
+                      services that email, prompt M-Pesa or WhatsApp refuse demo shops)
     users.ts, password.ts
   lib/                isomorphic and pure: safe on the client
     money.ts          cents/millilitre parsing, line totals, formatting
@@ -111,6 +115,7 @@ scripts/              seed, migrate (run with tsx)
 - The database backs this up: composite foreign keys `(customer_id, shop_id) -> customers(id, shop_id)` (and likewise for suppliers, subscriptions and reversals) make it impossible for a ledger row to reference another shop's records, even if a query is wrong.
 - Every new table holding shop data gets `shop_id` (with an index), and every new service or query gets a tenant-isolation test (see the `tenant isolation` block in `src/server/ledger.test.ts`).
 - The cron route loops over all shops and bills each one with `systemActor(shopId)`.
+- **Demo shops** (`shops.demo_expires_at` set, created by "Try the demo") are ordinary tenants with the same isolation. Anything new that reaches the outside world (email to a typed-in address, SMS, WhatsApp, M-Pesa) must refuse them with `isDemoShop` / `demoOff` from `server/demo/guard.ts`. Any new table with `shop_id` must be added to `purgeExpiredDemos` (the purge test checks every `shop_id` table is emptied).
 
 ## Authentication
 
@@ -153,7 +158,7 @@ The derived figures (see `src/lib/calc/summary.ts`):
 - **Outstanding credit**: payments are applied to the customer's oldest sales first (`allocatePayments`).
 
 The database enforces these rules. Don't work around them:
-- A trigger rejects `UPDATE`/`DELETE` on `ledger_entries` and `audit_log` (migration `0001_append_only.sql`).
+- A trigger rejects `UPDATE`/`DELETE` on `ledger_entries` and `audit_log` (migration `0001_append_only.sql`). The only exception is deleting the rows of an **expired demo shop** (migration `0015_demo_shops.sql`); a real shop can never be flagged as a demo.
 - **Corrections are reversals.** `reverseEntry` inserts the negated row with `reverses_id` set, dated on the original's business day. An entry can only be reversed once, and a reversal can't itself be reversed.
 - CHECK constraints: original rows are non-negative; a credit sale must have a customer; deliveries and supplier payments must have a supplier.
 - `idempotency_key` is unique. Subscription billing uses `sub:<subscriptionId>:<date>`, so running it twice bills nothing extra.

@@ -36,6 +36,7 @@ import { overCreditLimit } from '@/lib/calc/finance';
 import { computePay, type PayLine } from '@/lib/calc/payroll';
 import { MATCH_WINDOW_MINUTES, closestSale } from '@/lib/calc/reconcile';
 import { formatKES, lineTotalCents } from '@/lib/money';
+import { demoOff, isDemoShop } from './demo/guard';
 import type {
   CustomerInput,
   AdvanceInput,
@@ -747,6 +748,7 @@ export function setSalePrice(db: DB, actor: Actor, pricePerLitreCents: number) {
 export function setStockAlertPhone(db: DB, actor: Actor, phone: string | null) {
   return db.transaction(async (tx) => {
     if (!isManager(actor)) throw new DomainError('Only the owner can change notifications');
+    if (phone && (await isDemoShop(tx, actor.shopId))) throw new DomainError(demoOff('WhatsApp stock updates'));
     const [previous] = await tx
       .select({ phone: shops.stockAlertWhatsapp })
       .from(shops)

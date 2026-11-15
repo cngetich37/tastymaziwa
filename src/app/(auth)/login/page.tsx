@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { currentUser } from '@/server/session';
 import { LoginForm } from '../auth-forms';
 import { AuthHeading } from '../auth-heading';
+import { TryDemo } from '../try-demo';
+import { demoConfig } from '@/server/demo/demo';
 
 export const metadata = { title: 'Sign in · TastyMaziwa' };
 
@@ -14,6 +16,7 @@ export default async function LoginPage() {
       <Suspense>
         <LoginForm />
       </Suspense>
+      {demoConfig.enabled && <TryDemo />}
     </>
   );
 }

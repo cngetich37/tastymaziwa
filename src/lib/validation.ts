@@ -509,6 +509,9 @@ export const userRoleSchema = z.object({
 
 export const resendInviteSchema = z.object({ userId: id });
 
+/** Demo shops only: which of the demo's logins to switch to. */
+export const demoSwitchRoleSchema = z.object({ role: z.enum(['owner', 'attendant', 'supplier']) });
+
 /** Give a supplier (milkman) their own login, to record their deliveries. */
 export const inviteSupplierSchema = z.object({
   supplierId: id,

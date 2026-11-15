@@ -1,8 +1,10 @@
 import { SessionTimeout } from '@/components/session-timeout';
+import { DemoBanner } from '@/components/shell/demo-banner';
 import { SupplierHeader } from '@/components/shell/supplier-header';
 import { getDb } from '@/db';
 import { SUPPLIER } from '@/lib/roles';
 import { authConfig } from '@/server/auth/config';
+import { demoHoursLeft } from '@/server/demo/guard';
 import { getShop } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
@@ -16,7 +18,10 @@ export default async function SupplierLayout({ children }: { children: React.Rea
   return (
     <div className="min-h-dvh">
       <SupplierHeader name={user.name} shopName={shop?.name ?? 'TastyMaziwa'} />
-      <main className="mx-auto w-full max-w-3xl px-4 pt-5 pb-12 md:pt-8">{children}</main>
+      <main className="mx-auto w-full max-w-3xl px-4 pt-5 pb-12 md:pt-8">
+        {shop?.demoExpiresAt && <DemoBanner role={user.role} hoursLeft={demoHoursLeft(shop.demoExpiresAt)} />}
+        {children}
+      </main>
       <SessionTimeout idleSeconds={authConfig.sessionIdleSeconds} />
     </div>
   );

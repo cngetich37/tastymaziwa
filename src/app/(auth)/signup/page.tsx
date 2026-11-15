@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { currentUser } from '@/server/session';
 import { SignupForm } from '../auth-forms';
 import { AuthHeading } from '../auth-heading';
+import { TryDemo } from '../try-demo';
+import { demoConfig } from '@/server/demo/demo';
 
 export const metadata = { title: 'Create your shop · TastyMaziwa' };
 
@@ -14,6 +16,7 @@ export default async function SignupPage() {
       <Suspense>
         <SignupForm />
       </Suspense>
+      {demoConfig.enabled && <TryDemo />}
     </>
   );
 }

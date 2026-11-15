@@ -96,6 +96,19 @@ export const { handlers, signIn, signOut, auth, unstable_update: updateSession }
         return result;
       },
     }),
+    Credentials({
+      // "Try the demo": a short-lived signed token for a demo shop's login (server/demo).
+      id: 'demo',
+      credentials: { token: {} },
+      async authorize(raw) {
+        const token = (raw as { token?: unknown }).token;
+        if (typeof token !== 'string' || token.length > 300) throw new SignInFailed('invalid');
+        const { verifyDemoSignIn } = await import('@/server/demo/demo');
+        const result = await verifyDemoSignIn(await database(), token);
+        if (typeof result === 'string') throw new SignInFailed(result);
+        return result;
+      },
+    }),
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }) {

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/db';
 import { authTokens, shops } from '@/db/schema';
 import { pruneRateLimits } from '@/server/auth/rate-limit';
+import { purgeExpiredDemos } from '@/server/demo/demo';
 import { billSubscriptions, systemActor } from '@/server/ledger';
 
 /**
@@ -11,7 +12,8 @@ import { billSubscriptions, systemActor } from '@/server/ledger';
  * vercel.json). Requires `Authorization: Bearer $CRON_SECRET`, which Vercel
  * sends automatically when CRON_SECRET is set on the project. Safe to call
  * repeatedly: each subscription is billed at most once per business day.
- * Also prunes spent auth tokens and old rate-limit events.
+ * Also purges expired demo shops and prunes spent auth tokens and old
+ * rate-limit events.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -25,6 +27,14 @@ export async function GET(request: Request) {
   }
 
   const db = await getDb();
+  // Expired "Try the demo" sandboxes go first (they are never billed).
+  let demosPurged = 0;
+  try {
+    demosPurged = await purgeExpiredDemos(db, 500);
+  } catch (error) {
+    console.error('[cron] demo purge failed', error);
+  }
+
   const allShops = await db.select({ id: shops.id }).from(shops);
   const results = [];
   for (const shop of allShops) {
@@ -41,5 +51,5 @@ export async function GET(request: Request) {
   await db.delete(authTokens).where(or(lt(authTokens.expiresAt, dayAgo), isNotNull(authTokens.consumedAt)));
   await pruneRateLimits(db);
 
-  return NextResponse.json({ shops: results.length, results });
+  return NextResponse.json({ shops: results.length, results, demosPurged });
 }

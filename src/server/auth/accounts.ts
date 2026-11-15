@@ -14,6 +14,7 @@ import type { DB } from '@/db/client';
 import { auditLog, authTokens, shops, suppliers, users, type Role } from '@/db/schema';
 import type { InviteStaffInput, InviteSupplierInput, SignupInput } from '@/lib/validation';
 import { DomainError, type Actor } from '../ledger';
+import { demoOff, isDemoShop } from '../demo/guard';
 import { dummyVerify, hashPassword, verifyPassword } from '../password';
 import { appUrl, authConfig } from './config';
 import * as emails from './emails';
@@ -260,6 +261,7 @@ export async function changePassword(
 }
 
 export async function requestEmailChange(db: DB, actor: Actor, newEmail: string, ip: string): Promise<void> {
+  if (await isDemoShop(db, actor.shopId)) throw new DomainError(demoOff('Changing your email'));
   const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.email, newEmail));
   if (taken) throw new DomainError('That email is already in use');
   if (!(await consume(db, limits.sendEmail(newEmail, ip)))) {
@@ -354,6 +356,7 @@ async function invite(
   actor: Actor,
   input: { name: string; email: string; role: Role; supplierId: string | null },
 ) {
+  if (await isDemoShop(db, actor.shopId)) throw new DomainError(demoOff('Inviting people'));
   const token = generateLinkToken();
   const { user, shopName, inviterName } = await db.transaction(async (tx) => {
     const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.email, input.email));
@@ -427,6 +430,7 @@ export async function setUserRole(db: DB, actor: Actor, userId: string, role: Ro
  * yet. Any previous link stops working. Counts against the email rate limits.
  */
 export async function resendInvite(db: DB, actor: Actor, userId: string, ip: string): Promise<void> {
+  if (await isDemoShop(db, actor.shopId)) throw new DomainError(demoOff('Sending invites'));
   const [target] = await db
     .select({
       id: users.id,

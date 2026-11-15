@@ -19,6 +19,7 @@ import { formatKES } from '@/lib/money';
 import type { MpesaCustomerPaymentInput, MpesaSaleInput, MpesaSettingsInput } from '@/lib/validation';
 import { appUrl } from '../auth/config';
 import { DomainError, assertCustomer, postMpesaRequest, quoteSale, type Actor } from '../ledger';
+import { demoOff, isDemoShop } from '../demo/guard';
 import { callbackTokenMatches, decryptSecret, encryptSecret, hashCallbackToken, newCallbackToken } from './crypto';
 import {
   DarajaError,
@@ -82,6 +83,7 @@ async function credentials(db: DB, shopId: string): Promise<{ creds: DarajaCrede
 
 export async function saveMpesaSettings(db: DB, actor: Actor, input: MpesaSettingsInput) {
   if (actor.role !== 'owner') throw new DomainError('Only the owner sets up M-Pesa');
+  if (await isDemoShop(db, actor.shopId)) throw new DomainError(demoOff('Connecting M-Pesa'));
   return db.transaction(async (tx) => {
     const [existing] = await tx.select().from(mpesaSettings).where(eq(mpesaSettings.shopId, actor.shopId));
     const secret = (fresh: string | undefined, saved: string | undefined, label: string) => {

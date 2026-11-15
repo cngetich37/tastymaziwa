@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { SessionTimeout } from '@/components/session-timeout';
 import { DesktopSidebar } from '@/components/shell/app-sidebar';
+import { DemoBanner } from '@/components/shell/demo-banner';
 import { EntryDataProvider } from '@/components/shell/entry-data';
 import { MobileHeader, MobileTabBar } from '@/components/shell/mobile-shell';
 import { ModuleTabs } from '@/components/shell/module-tabs';
@@ -8,6 +9,7 @@ import { SIDEBAR_COOKIE } from '@/components/shell/nav-items';
 import { getDb } from '@/db';
 import { authConfig } from '@/server/auth/config';
 import { mpesaReady } from '@/server/mpesa/payments';
+import { demoHoursLeft } from '@/server/demo/guard';
 import { getShop, getStockLevels, getSupplierLogins, listCustomers, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
@@ -73,6 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <MobileHeader user={me} shopName={shopName} />
           {/* Bottom padding clears the phone tab bar and its raised Record button. */}
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12">
+            {shop?.demoExpiresAt && <DemoBanner role={user.role} hoursLeft={demoHoursLeft(shop.demoExpiresAt)} />}
             <ModuleTabs role={user.role} />
             {children}
           </main>

@@ -106,6 +106,13 @@
       "when": 1794758656270,
       "tag": "0014_high_miek",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794760820337,
+      "tag": "0015_demo_shops",
+      "breakpoints": true
     }
   ]
 }

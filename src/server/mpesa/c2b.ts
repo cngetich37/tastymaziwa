@@ -29,6 +29,7 @@ import {
 import { toBusinessDate, type BusinessDate } from '@/lib/dates';
 import { appUrl } from '../auth/config';
 import { DomainError, postC2bCustomerPayment, type Actor } from '../ledger';
+import { demoOff, isDemoShop } from '../demo/guard';
 import { callbackTokenMatches, decryptSecret, hashCallbackToken, newCallbackToken } from './crypto';
 import { DarajaError, parseC2bConfirmation, registerC2bUrls, simulateC2b, type DarajaCredentials } from './daraja';
 
@@ -61,6 +62,7 @@ async function settingsRow(db: DB, shopId: string) {
  */
 export async function connectTill(db: DB, actor: Actor, fetchImpl: Fetch = fetch) {
   ownerOnly(actor);
+  if (await isDemoShop(db, actor.shopId)) throw new DomainError(demoOff('Connecting a till'));
   const { creds } = await settingsRow(db, actor.shopId);
   const token = newCallbackToken();
   const base = `${appUrl()}/api/payments/c2b/${actor.shopId}/${token}`;

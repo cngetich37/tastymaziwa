@@ -129,6 +129,8 @@ Mark each item done with `[x]` as it ships.
 ## P3: Expansion
 
 - [x] **Multi-tenant.** Each sign-up gets its own private shop (`shop_id` everywhere, composite same-shop foreign keys, isolation tests).
+- [x] **Try the demo** (button on `/login` and `/signup`). One tap, no email: each visitor gets a private sandbox shop (`server/demo/`) with six weeks of sample trading in every module: credit in every ageing bucket, subscriptions, three suppliers (one with his own login and a delivery waiting for approval), products, budgets (one over), a reversed mistake, staff with attendance and an advance, last month's payroll to run, and yesterday's short shift close to sign off. A banner switches between the demo's Owner, Seller and Supplier logins. Invites, email changes, M-Pesa and WhatsApp are refused in demos, and demo addresses are `.invalid`. Demos expire after 24 h and are purged by the daily cron; the append-only triggers allow deletes only for expired demo shops (migration 0015). Rate-limited per IP and capped (`DEMO_MAX_LIVE`); `DEMO_DISABLED=1` turns it off. `db:seed -- --demo` uses the same data.
+  - [ ] "Keep this shop": turn a demo into a real shop at sign-up, instead of starting empty.
 - [ ] **Multi-outlet.** One owner running several shops: shop switcher, per-outlet dashboards and a consolidated view. Needs a user-to-shop membership table instead of `users.shop_id`.
 - [ ] **eTIMS integration** (KRA electronic tax invoices) if the business crosses the VAT/turnover threshold.
 - [ ] **USSD access** for an attendant without a smartphone, via Africa's Talking USSD.

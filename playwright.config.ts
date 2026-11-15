@@ -27,6 +27,7 @@ function server(port: number, dir: string, outbox: string, env: Record<string, s
       EMAIL_OUTBOX_DIR: outbox,
       // Every test shares one IP; per-address limits still apply as normal.
       RATE_LIMIT_EMAILS_PER_IP: '1000',
+      RATE_LIMIT_DEMOS_PER_IP: '1000',
       ...env,
     },
   };
