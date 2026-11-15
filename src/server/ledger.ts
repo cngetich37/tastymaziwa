@@ -1176,7 +1176,8 @@ export function postPayroll(db: DB, actor: Actor, input: PostPayrollInput) {
         grossCents: sum('grossCents'),
         advancesCents: sum('advancesCents'),
         netCents: sum('netCents'),
-        statutoryDueCents: sum('employeeTotalCents') + sum('employerNssfCents') + sum('employerHousingLevyCents'),
+        statutoryDueCents:
+          sum('employeeTotalCents') + sum('employerNssfCents') + sum('employerHousingLevyCents') + sum('employerNitaCents'),
         postedBy: actor.id,
       })
       .returning();
@@ -1211,6 +1212,7 @@ export function postPayroll(db: DB, actor: Actor, input: PostPayrollInput) {
         payeCents: line.payeCents,
         employerNssfCents: line.employerNssfCents,
         employerHousingLevyCents: line.employerHousingLevyCents,
+        employerNitaCents: line.employerNitaCents,
         ledgerEntryId: entry?.id ?? null,
       });
       await tx
@@ -1266,7 +1268,7 @@ export function remitStatutory(db: DB, actor: Actor, input: RemitStatutoryInput)
       amountCents: run.statutoryDueCents,
       paymentMethod: input.paymentMethod,
       expenseCategory: 'statutory',
-      note: `NSSF, SHIF, housing levy and PAYE for ${run.month}`,
+      note: `PAYE, NSSF, SHIF, housing and NITA levies for ${run.month}`,
       idempotencyKey: `remit:${run.id}`,
     });
     const [updated] = await tx

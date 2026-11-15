@@ -1,0 +1,1 @@
+ALTER TABLE "payroll_lines" ADD COLUMN "employer_nita_cents" bigint DEFAULT 0 NOT NULL;

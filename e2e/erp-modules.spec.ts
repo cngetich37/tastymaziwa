@@ -129,8 +129,8 @@ test('a formally employed salary gets NSSF, SHIF, levy and PAYE, a payslip, and 
   await expect(statutory).toContainText('Ksh 19,308.35');
   await expect(statutory).toContainText('not paid over yet');
   await statutory.getByRole('button', { name: 'Record payment' }).click();
-  await formReady(page, 'Record payment of Ksh 37,058.35');
-  await page.getByRole('button', { name: 'Record payment of Ksh 37,058.35' }).click();
+  await formReady(page, 'Record payment of Ksh 37,108.35');
+  await page.getByRole('button', { name: 'Record payment of Ksh 37,108.35' }).click();
   await expect(page.getByText('Statutory payment recorded').first()).toBeVisible();
   await expect(statutory).toContainText('paid over on');
 
@@ -138,4 +138,27 @@ test('a formally employed salary gets NSSF, SHIF, levy and PAYE, a payslip, and 
   const slip = page.getByRole('region', { name: 'Payslip for Wanjiku' });
   await expect(slip).toContainText('KRA PIN A123456789B');
   await expect(slip).toContainText('Ksh 70,441.65');
+
+  // The iTax return: Sheet B rows as a CSV for the template's Import CSV button.
+  await page.getByRole('link', { name: 'Payroll' }).first().click();
+  await page.getByRole('link', { name: 'Previous month' }).click();
+  await page.getByRole('link', { name: 'iTax return' }).click();
+  await expect(page.getByRole('heading', { name: 'iTax PAYE return' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Sheet B employee details' })).toContainText('A123456789B');
+  await expect(page.getByRole('region', { name: 'Sheet E tax due' })).toContainText('Ksh 19,308.35');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Sheet B CSV' }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^paye-sheet-b-\d{4}-\d{2}\.csv$/);
+  const csv = await (await import('node:fs/promises')).readFile((await file.path())!, 'utf8');
+  expect(csv).toContain('A123456789B,Wanjiku,Resident,Primary Employee,No,,100000.00');
+  expect(csv.trim()).toMatch(/,19308\.35,19308\.35$/);
+
+  // The year's P9A card.
+  await page.goto('/payroll/p9');
+  const lastMonthYear = await page.evaluate(() => new Date(Date.now() - 28 * 864e5).getFullYear());
+  if (lastMonthYear !== new Date().getFullYear()) await page.getByRole('link', { name: 'Previous year' }).click();
+  const card = page.getByRole('region', { name: 'P9 for Wanjiku' });
+  await expect(card).toContainText('89750.00');
+  await expect(card).toContainText('19308.35');
 });

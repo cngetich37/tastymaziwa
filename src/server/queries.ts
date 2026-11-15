@@ -850,6 +850,7 @@ export async function getPayslips(db: DB, shopId: string, runId: string, employe
       netCents: payrollLines.netCents,
       employerNssfCents: payrollLines.employerNssfCents,
       employerHousingLevyCents: payrollLines.employerHousingLevyCents,
+      employerNitaCents: payrollLines.employerNitaCents,
     })
     .from(payrollLines)
     .innerJoin(employees, and(eq(employees.id, payrollLines.employeeId), eq(employees.shopId, payrollLines.shopId)))
@@ -865,6 +866,44 @@ export async function getPayslips(db: DB, shopId: string, runId: string, employe
 }
 
 export type Payslip = NonNullable<Awaited<ReturnType<typeof getPayslips>>>['lines'][number];
+
+/**
+ * A calendar year of posted pay for staff with statutory deductions: one
+ * entry per person, with their lines by month (for the P9A card).
+ */
+export async function getP9Data(db: DB, shopId: string, year: number) {
+  const rows = await db
+    .select({
+      employeeId: employees.id,
+      name: employees.name,
+      kraPin: employees.kraPin,
+      month: payrollRuns.month,
+      grossCents: payrollLines.grossCents,
+      nssfCents: payrollLines.nssfCents,
+      shifCents: payrollLines.shifCents,
+      housingLevyCents: payrollLines.housingLevyCents,
+      taxableCents: payrollLines.taxableCents,
+      payeCents: payrollLines.payeCents,
+    })
+    .from(payrollLines)
+    .innerJoin(payrollRuns, and(eq(payrollRuns.id, payrollLines.runId), eq(payrollRuns.shopId, payrollLines.shopId)))
+    .innerJoin(employees, and(eq(employees.id, payrollLines.employeeId), eq(employees.shopId, payrollLines.shopId)))
+    .where(
+      and(
+        eq(payrollLines.shopId, shopId),
+        sql`${payrollRuns.month} like ${`${year}-%`}`,
+        // Only people who had statutory deductions that year need a P9.
+        sql`${payrollLines.nssfCents} + ${payrollLines.shifCents} + ${payrollLines.housingLevyCents} + ${payrollLines.payeCents} > 0`,
+      ),
+    )
+    .orderBy(employees.name, payrollRuns.month);
+  return [...Map.groupBy(rows, (r) => r.employeeId).values()].map((lines) => ({
+    employeeId: lines[0].employeeId,
+    name: lines[0].name,
+    kraPin: lines[0].kraPin,
+    months: new Map(lines.map((l) => [l.month, l])),
+  }));
+}
 
 // --- shop ---------------------------------------------------------------------
 

@@ -28,6 +28,10 @@ export const SHIF_RATE = 0.0275;
 export const SHIF_MINIMUM_CENTS = 300 * KES;
 export const HOUSING_LEVY_RATE = 0.015;
 export const PERSONAL_RELIEF_CENTS = 2_400 * KES;
+/** NITA (Industrial Training) levy: KES 50 per employee per month, paid by the employer. */
+export const NITA_LEVY_CENTS = 50 * KES;
+/** P9A column E3: the most pension (NSSF included) deductible per month. */
+export const PENSION_CAP_CENTS = 30_000 * KES;
 
 /** Monthly PAYE bands: the rate applies to taxable pay up to `upToCents`. */
 export const PAYE_BANDS = [
@@ -54,8 +58,8 @@ export function nssfCents(grossCents: number, month: string): { tier1: number; t
 export const shifCents = (grossCents: number) => Math.max(SHIF_MINIMUM_CENTS, Math.round(grossCents * SHIF_RATE));
 export const housingLevyCents = (grossCents: number) => Math.round(grossCents * HOUSING_LEVY_RATE);
 
-/** Monthly PAYE on taxable pay, after personal relief; never below zero. */
-export function payeCents(taxableCents: number): number {
+/** Tax charged on monthly taxable pay, before relief (P9A column L). */
+export function taxChargedCents(taxableCents: number): number {
   let tax = 0;
   let lower = 0;
   for (const band of PAYE_BANDS) {
@@ -63,7 +67,12 @@ export function payeCents(taxableCents: number): number {
     tax += (Math.min(taxableCents, band.upToCents) - lower) * band.rate;
     lower = band.upToCents;
   }
-  return Math.max(0, Math.round(tax) - PERSONAL_RELIEF_CENTS);
+  return Math.round(tax);
+}
+
+/** Monthly PAYE on taxable pay, after personal relief; never below zero. */
+export function payeCents(taxableCents: number): number {
+  return Math.max(0, taxChargedCents(taxableCents) - PERSONAL_RELIEF_CENTS);
 }
 
 export interface Statutory {
@@ -77,6 +86,7 @@ export interface Statutory {
   employeeTotalCents: number;
   employerNssfCents: number;
   employerHousingLevyCents: number;
+  employerNitaCents: number;
 }
 
 export const NO_STATUTORY: Statutory = {
@@ -88,6 +98,7 @@ export const NO_STATUTORY: Statutory = {
   employeeTotalCents: 0,
   employerNssfCents: 0,
   employerHousingLevyCents: 0,
+  employerNitaCents: 0,
 };
 
 /** Every statutory amount for one month's gross pay. Zero pay, zero deductions. */
@@ -107,5 +118,6 @@ export function statutoryDeductions(grossCents: number, month: string): Statutor
     employeeTotalCents: nssf + shif + levy + paye,
     employerNssfCents: nssf,
     employerHousingLevyCents: levy,
+    employerNitaCents: NITA_LEVY_CENTS,
   };
 }

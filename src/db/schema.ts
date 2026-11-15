@@ -502,6 +502,7 @@ export const payrollLines = pgTable(
     payeCents: cents('paye_cents').notNull().default(0),
     employerNssfCents: cents('employer_nssf_cents').notNull().default(0),
     employerHousingLevyCents: cents('employer_housing_levy_cents').notNull().default(0),
+    employerNitaCents: cents('employer_nita_cents').notNull().default(0),
     /** The wages expense for the net pay; null when nothing was left to pay. */
     ledgerEntryId: uuid('ledger_entry_id'),
   },

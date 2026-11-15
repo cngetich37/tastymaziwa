@@ -14,7 +14,7 @@ import {
   setEmployeeActive,
   type Actor,
 } from './ledger';
-import { getPayslips, listEmployees, listPayrollRuns } from './queries';
+import { getP9Data, getPayslips, listEmployees, listPayrollRuns } from './queries';
 
 let db: DB;
 let close: () => Promise<void>;
@@ -153,7 +153,7 @@ describe('statutory deductions', () => {
     const run = await postPayroll(db, owner, { month, paymentMethod: 'mpesa' });
     const employee = 600_000 + 275_000 + 150_000 + 1_930_835;
     expect(run.netCents).toBe(10_000_000 - employee);
-    expect(run.statutoryDueCents).toBe(employee + 600_000 + 150_000);
+    expect(run.statutoryDueCents).toBe(employee + 600_000 + 150_000 + 5000); // + NITA KES 50
 
     const slips = await getPayslips(db, shop.id, run.id);
     expect(slips?.lines).toEqual([
@@ -171,6 +171,12 @@ describe('statutory deductions', () => {
       .where(and(eq(ledgerEntries.shopId, shop.id), eq(ledgerEntries.expenseCategory, 'statutory')));
     expect(paid.amountCents).toBe(run.statutoryDueCents);
     await expect(remitStatutory(db, owner, { runId: run.id, paymentMethod: 'cash' })).rejects.toThrow('already paid over');
+
+    // The year's P9 data has the month, for this shop only.
+    const p9 = await getP9Data(db, shop.id, Number(month.slice(0, 4)));
+    expect(p9).toHaveLength(1);
+    expect(p9[0].months.get(month)).toMatchObject({ grossCents: 10_000_000, taxableCents: 8_975_000, payeCents: 1_930_835 });
+    expect(await getP9Data(db, a.shopId, Number(month.slice(0, 4)))).toEqual([]);
 
     // Another shop can't see the payslips or pay them over.
     expect(await getPayslips(db, a.shopId, run.id)).toBeNull();

@@ -104,7 +104,10 @@ Mark each item done with `[x]` as it ships.
 - [x] **Statutory deductions** for staff marked "formally employed": NSSF (6% + 6%, Tier I/II limits by effective month), SHIF (2.75%, min KES 300), Affordable Housing Levy (1.5% + 1.5%) and PAYE (monthly bands, after those deductions, less KES 2,400 relief). Rates live in `lib/calc/statutory.ts` as dated tables. Amounts owed are tracked per payroll and recorded as a `statutory` expense when paid over (due by the 9th).
 - [x] **Payslips** (`/payroll/[runId]/payslips`): one per person, printable (one per page) or sent by WhatsApp.
 - [ ] Check rates against KRA / NSSF / SHA each February and July (Finance Act); add rows to `NSSF_SCHEDULE` / `PAYE_BANDS`, don't edit old ones.
-- [ ] P9 year-end tax card and iTax PAYE CSV export.
+- [x] **P9A tax cards** (`/payroll/p9`): KRA's 2025 template columns A–O per month and year totals, per employee, printable.
+- [x] **iTax PAYE return** (`/payroll/[runId]/itax`): Sheet B of KRA's simplified return (template v30, July 2025) as a 25-column CSV for the template's Import CSV button, Sheet E totals to check against, and filing steps. Employees without a KRA PIN are flagged for Sheet E row 5.
+- [x] **NITA levy** (KES 50 per employee per month, employer) is included in the statutory amount owed for new payrolls.
+- [ ] Employee fields for non-resident / secondary employment and PWD exemption (currently: resident primary, no exemption).
 
 ## P2: Standout features
 

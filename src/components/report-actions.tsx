@@ -31,3 +31,30 @@ export function PrintButton() {
     </Button>
   );
 }
+
+/** Download text built on the server (e.g. the iTax CSV) as a file. */
+export function DownloadTextButton({
+  content,
+  filename,
+  label,
+  mime = 'text/csv;charset=utf-8',
+}: {
+  content: string;
+  filename: string;
+  label: string;
+  mime?: string;
+}) {
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([content], { type: mime }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <Button className="h-11 gap-2 print:hidden" onClick={download}>
+      <Download className="size-4" aria-hidden /> {label}
+    </Button>
+  );
+}

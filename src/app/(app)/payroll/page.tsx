@@ -32,6 +32,7 @@ interface Line {
   netCents: number;
   employerNssfCents: number;
   employerHousingLevyCents: number;
+  employerNitaCents: number;
 }
 
 const deductions = (l: Line) => l.nssfCents + l.shifCents + l.housingLevyCents + l.payeCents;
@@ -91,8 +92,9 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     nssf: total((l) => l.nssfCents + l.employerNssfCents),
     shif: total((l) => l.shifCents),
     levy: total((l) => l.housingLevyCents + l.employerHousingLevyCents),
+    nita: total((l) => l.employerNitaCents),
   };
-  const statutoryDue = statutory.paye + statutory.nssf + statutory.shif + statutory.levy;
+  const statutoryDue = statutory.paye + statutory.nssf + statutory.shif + statutory.levy + statutory.nita;
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -101,18 +103,27 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         description={`Wages for ${monthName(month)}`}
         actions={
           paid ? (
-            <Button asChild variant="outline" className="h-11 gap-2">
-              <Link href={`/payroll/${paid.id}/payslips`}>
-                <FileText className="size-4" aria-hidden /> Payslips
-              </Link>
-            </Button>
+            <>
+              {statutoryDue > 0 && (
+                <Button asChild variant="outline" className="h-11 gap-2">
+                  <Link href={`/payroll/${paid.id}/itax`}>
+                    <Landmark className="size-4" aria-hidden /> iTax return
+                  </Link>
+                </Button>
+              )}
+              <Button asChild variant="outline" className="h-11 gap-2">
+                <Link href={`/payroll/${paid.id}/payslips`}>
+                  <FileText className="size-4" aria-hidden /> Payslips
+                </Link>
+              </Button>
+            </>
           ) : net + total((l) => l.advancesCents) > 0 ? (
             <PostPayrollButton month={month} monthLabel={monthName(month)} netCents={net} />
           ) : undefined
         }
       />
 
-      <nav aria-label="Choose a month" className="flex items-center gap-2">
+      <nav aria-label="Choose a month" className="flex flex-wrap items-center gap-2">
         <Button asChild variant="outline" size="icon" className="size-11">
           <Link href={`/payroll?month=${shiftMonth(month, -1)}`} aria-label="Previous month">
             <ChevronLeft className="size-5" aria-hidden />
@@ -130,6 +141,12 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             </Link>
           </Button>
         )}
+        <Link
+          href={`/payroll/p9?year=${month.slice(0, 4)}`}
+          className="ml-auto flex h-11 items-center text-sm text-primary underline-offset-2 hover:underline"
+        >
+          P9 tax cards
+        </Link>
       </nav>
 
       {paid && (
@@ -175,7 +192,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                 <Landmark className="size-5 text-primary" aria-hidden /> Owed to KRA, NSSF and SHA
               </CardTitle>
               <CardDescription>
-                Employee deductions plus your employer share. Due by {formatLongDate(dueDate(month))}.
+                Employee deductions plus your employer share (NSSF, housing levy, NITA). Due by {formatLongDate(dueDate(month))}.
               </CardDescription>
             </div>
             {paid && !paid.remittedAt && (
@@ -189,6 +206,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                 { label: 'NSSF (both shares)', cents: statutory.nssf },
                 { label: 'SHIF (SHA)', cents: statutory.shif },
                 { label: 'Housing levy (both shares)', cents: statutory.levy },
+                ...(statutory.nita ? [{ label: 'NITA levy (employer)', cents: statutory.nita }] : []),
               ].map((s) => (
                 <div key={s.label} className="rounded-lg border p-3">
                   <dt className="text-xs text-muted-foreground">{s.label}</dt>

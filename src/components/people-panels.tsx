@@ -137,7 +137,7 @@ export function RemitStatutoryButton({ runId, dueCents, monthLabel }: { runId: s
     <FormDialog
       trigger={<Button className="h-11">Record payment</Button>}
       title={`Statutory deductions for ${monthLabel}`}
-      description="Once you have paid NSSF, SHIF, the housing levy and PAYE over (via iTax / e-Citizen)."
+      description="Once you have paid PAYE, the housing and NITA levies (iTax), NSSF and SHIF over."
     >
       {(close) => <RemitStatutoryForm runId={runId} dueCents={dueCents} onDone={close} />}
     </FormDialog>
