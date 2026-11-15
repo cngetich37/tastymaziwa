@@ -57,7 +57,7 @@ export interface EntryDefaults {
 }
 
 function EntryForm({ kind, defaults, onDone }: { kind: EntryKind; defaults: EntryDefaults; onDone: () => void }) {
-  const { customers, suppliers, products, salePriceCents, isOwner } = useEntryData();
+  const { customers, suppliers, products, salePriceCents, isOwner, mpesaReady } = useEntryData();
   const { customerId, supplierId, productId, date } = defaults;
   switch (kind) {
     case 'sale':
@@ -67,6 +67,7 @@ function EntryForm({ kind, defaults, onDone }: { kind: EntryKind; defaults: Entr
           products={products}
           salePriceCents={salePriceCents}
           canEditPrice={isOwner}
+          mpesaReady={mpesaReady}
           defaultCustomerId={customerId}
           date={date}
           onDone={onDone}
@@ -84,7 +85,15 @@ function EntryForm({ kind, defaults, onDone }: { kind: EntryKind; defaults: Entr
         />
       );
     case 'payment':
-      return <CustomerPaymentForm customers={customers} defaultCustomerId={customerId} date={date} onDone={onDone} />;
+      return (
+        <CustomerPaymentForm
+          customers={customers}
+          defaultCustomerId={customerId}
+          date={date}
+          mpesaReady={mpesaReady && !date}
+          onDone={onDone}
+        />
+      );
     case 'spoilage':
       return <SpoilageForm date={date} products={products} defaultProductId={productId} onDone={onDone} />;
     case 'supplier':

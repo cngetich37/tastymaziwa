@@ -16,6 +16,8 @@ export interface EntryData {
   /** The owner's selling price; null until it is set in Settings. */
   salePriceCents: number | null;
   isOwner: boolean;
+  /** M-Pesa prompts (STK Push) are set up and switched on. */
+  mpesaReady: boolean;
 }
 
 const EntryDataContext = createContext<EntryData | null>(null);

@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { z } from 'zod';
+import type { ActionResult } from '@/lib/action-result';
+import { MpesaPhoneField, MpesaPromptStatus, checkMpesaPhone } from '@/components/mpesa-prompt';
 import { Banknote, CalendarClock, Lock, NotebookPen, Smartphone } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 import { Form } from '@/components/ui/form';
@@ -10,6 +13,7 @@ import {
   createSubscriptionAction,
   createSupplierAction,
   inviteStaffAction,
+  saveMpesaSettingsAction,
   createEmployeeAction,
   giveAdvanceAction,
   postPayrollAction,
@@ -23,6 +27,8 @@ import {
   recordDeliveryAction,
   recordExpenseAction,
   recordSaleAction,
+  startMpesaCustomerPaymentAction,
+  startMpesaSaleAction,
   recordSpoilageAction,
   recordSupplierPaymentAction,
   reviewDeliveryAction,
@@ -47,6 +53,7 @@ import {
   productSchema,
   reviewDeliverySchema,
   salePriceSchema,
+  mpesaSettingsSchema,
   advanceSchema,
   employeeSchema,
   postPayrollSchema,
@@ -74,6 +81,8 @@ export interface CustomerOption {
   balanceCents: number;
   /** Null = no limit. */
   creditLimitCents?: number | null;
+  /** E.164; pre-fills M-Pesa prompts. */
+  phone?: string | null;
 }
 
 export interface SupplierOption {
@@ -224,6 +233,7 @@ function NoSuppliers() {
 export function SaleForm({
   customers,
   products = [],
+  mpesaReady = false,
   salePriceCents,
   canEditPrice,
   defaultCustomerId,
@@ -239,10 +249,34 @@ export function SaleForm({
     /** Owners may change the price for this one sale. */
     canEditPrice: boolean;
     defaultCustomerId?: string;
+    /** M-Pesa prompts (STK Push) are set up for this shop. */
+    mpesaReady?: boolean;
   }) {
+  const [mpesaPhone, setMpesaPhone] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<{ requestId: string; phone: string } | null>(null);
+
+  // With a phone number, an M-Pesa sale sends a PIN prompt instead of being recorded straight away.
+  const submit = async (raw: z.input<typeof saleSchema>): Promise<ActionResult<{ id: string } | { requestId: string }>> => {
+    const { phone, error } = checkMpesaPhone(mpesaPhone);
+    setPhoneError(error);
+    if (mpesaReady && raw.paymentMethod === 'mpesa' && (phone || error)) {
+      if (error) return { ok: false as const, error };
+      return startMpesaSaleAction({
+        litres: raw.litres,
+        productId: raw.productId,
+        pricePerLitre: raw.pricePerLitre,
+        customerId: raw.customerId,
+        note: raw.note,
+        phone: phone!,
+      });
+    }
+    return recordSaleAction(raw);
+  };
+
   const { form, onSubmit, pending } = useActionForm(
     saleSchema,
-    recordSaleAction,
+    submit,
     {
       litres: '',
       // Blank = the shop's price, decided on the server.
@@ -254,7 +288,13 @@ export function SaleForm({
       date: date ?? '',
       note: '',
     },
-    { success: 'Sale recorded', onSuccess: onDone },
+    {
+      success: (data) => ('requestId' in data ? 'M-Pesa prompt sent' : 'Sale recorded'),
+      onSuccess: (data) => {
+        if ('requestId' in data) setPrompt({ requestId: data.requestId, phone: mpesaPhone });
+        else onDone?.();
+      },
+    },
   );
   const [litres, price, method, customerId, productId] = form.watch([
     'litres',
@@ -279,8 +319,20 @@ export function SaleForm({
     return <Notice>The owner hasn&apos;t set a selling price yet, so sales can&apos;t be recorded.</Notice>;
   }
 
+  if (prompt) {
+    return (
+      <MpesaPromptStatus
+        requestId={prompt.requestId}
+        phone={prompt.phone}
+        onPaid={() => onDone?.()}
+        onRetry={() => setPrompt(null)}
+      />
+    );
+  }
+
   const unitCents = canEditPrice ? parsePrice(price) : fixedCents;
   const total = previewTotalCents(litres, unitCents);
+  const prompting = mpesaReady && method === 'mpesa' && mpesaPhone.trim() !== '';
   const customer = method === 'credit' ? customers.find((c) => c.id === customerId) : undefined;
 
   return (
@@ -317,6 +369,7 @@ export function SaleForm({
           </p>
         )}
         <ChoiceField name="paymentMethod" label="Paid by" options={SALE_METHODS} />
+        {mpesaReady && method === 'mpesa' && <MpesaPhoneField value={mpesaPhone} onChange={setMpesaPhone} error={phoneError} />}
         {method === 'credit' && (
           <>
             <SelectField name="customerId" label="Customer" options={customerOptions(customers)} />
@@ -332,7 +385,7 @@ export function SaleForm({
           cents={total}
           detail={customer && total != null ? creditDetail(customer, total, canEditPrice) : null}
         />
-        <SubmitButton pending={pending}>Record sale</SubmitButton>
+        <SubmitButton pending={pending}>{prompting ? 'Send M-Pesa prompt' : 'Record sale'}</SubmitButton>
       </form>
     </Form>
   );
@@ -695,6 +748,78 @@ export function PostPayrollForm({ month, netCents, onDone }: FormProps & { month
   );
 }
 
+// --- M-Pesa settings ------------------------------------------------------------------
+
+export interface MpesaSettingsSummary {
+  enabled: boolean;
+  environment: 'sandbox' | 'production';
+  shortcodeType: 'paybill' | 'till';
+  businessShortcode: string;
+  tillNumber: string | null;
+  accountReference: string;
+}
+
+/** The shop's Daraja credentials. Secrets are write-only: blank keeps what is saved. */
+export function MpesaSettingsForm({
+  saved,
+  shopName,
+  onDone,
+}: FormProps & { saved: MpesaSettingsSummary | null; shopName: string }) {
+  const { form, onSubmit, pending } = useActionForm(
+    mpesaSettingsSchema,
+    saveMpesaSettingsAction,
+    {
+      enabled: saved?.enabled ?? true,
+      environment: saved?.environment ?? 'sandbox',
+      shortcodeType: saved?.shortcodeType ?? 'till',
+      businessShortcode: saved?.businessShortcode ?? '',
+      tillNumber: saved?.tillNumber ?? '',
+      accountReference: saved?.accountReference ?? shopName.slice(0, 12),
+      consumerKey: '',
+      consumerSecret: '',
+      passkey: '',
+    },
+    { success: 'M-Pesa settings saved', onSuccess: onDone },
+  );
+  const type = form.watch('shortcodeType');
+  const keep = saved ? 'Leave blank to keep the saved one.' : undefined;
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <ChoiceField
+          name="environment"
+          label="Mode"
+          options={[
+            { value: 'sandbox', label: 'Test (sandbox)' },
+            { value: 'production', label: 'Live' },
+          ]}
+        />
+        <ChoiceField
+          name="shortcodeType"
+          label="Customers pay to"
+          options={[
+            { value: 'till', label: 'Till (Buy Goods)' },
+            { value: 'paybill', label: 'Paybill' },
+          ]}
+        />
+        <TextField
+          name="businessShortcode"
+          label={type === 'till' ? 'Head office (store) number' : 'Paybill number'}
+          kind="code"
+          description={type === 'till' ? 'The store number your till belongs to, from Safaricom.' : undefined}
+        />
+        {type === 'till' && <TextField name="tillNumber" label="Till number" kind="code" />}
+        <TextField name="accountReference" label="Reference on the prompt" description="12 characters at most, e.g. your shop name." />
+        <TextField name="consumerKey" label="Consumer key" kind="password" description={keep} />
+        <TextField name="consumerSecret" label="Consumer secret" kind="password" description={keep} />
+        <TextField name="passkey" label="Passkey" kind="password" description={keep ?? 'Sent by Safaricom when your app goes live.'} />
+        <CheckboxField name="enabled" label="Send prompts from the counter" description="Untick to pause M-Pesa prompts." />
+        <SubmitButton pending={pending}>Save M-Pesa settings</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
 // --- shift close ------------------------------------------------------------------
 
 export interface CloseResult {
@@ -942,15 +1067,55 @@ export function CustomerPaymentForm({
   defaultCustomerId,
   date,
   onDone,
-}: FormProps & DatedProps & { customers: CustomerOption[]; defaultCustomerId?: string }) {
+  mpesaReady = false,
+}: FormProps & DatedProps & { customers: CustomerOption[]; defaultCustomerId?: string; mpesaReady?: boolean }) {
+  const [mpesaPhone, setMpesaPhone] = useState(customers.find((c) => c.id === defaultCustomerId)?.phone ?? '');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<{ requestId: string; phone: string } | null>(null);
+
+  const submit = async (
+    raw: z.input<typeof customerPaymentSchema>,
+  ): Promise<ActionResult<{ id: string } | { requestId: string }>> => {
+    const { phone, error } = checkMpesaPhone(mpesaPhone);
+    setPhoneError(error);
+    if (mpesaReady && raw.paymentMethod === 'mpesa' && (phone || error)) {
+      if (error) return { ok: false as const, error };
+      return startMpesaCustomerPaymentAction({ customerId: raw.customerId, amount: raw.amount, phone: phone! });
+    }
+    return recordCustomerPaymentAction(raw);
+  };
+
   const { form, onSubmit, pending } = useActionForm(
     customerPaymentSchema,
-    recordCustomerPaymentAction,
+    submit,
     { customerId: defaultCustomerId ?? '', amount: '', paymentMethod: 'mpesa', date: date ?? '', note: '' },
-    { success: 'Payment received', onSuccess: onDone },
+    {
+      success: (data) => ('requestId' in data ? 'M-Pesa prompt sent' : 'Payment received'),
+      onSuccess: (data) => {
+        if ('requestId' in data) setPrompt({ requestId: data.requestId, phone: mpesaPhone });
+        else onDone?.();
+      },
+    },
   );
-  const selected = customers.find((c) => c.id === form.watch('customerId'));
+  const customerId = form.watch('customerId');
+  const selected = customers.find((c) => c.id === customerId);
   const owed = selected && selected.balanceCents > 0 ? selected.balanceCents : 0;
+  const method = form.watch('paymentMethod');
+
+  // Choosing a customer brings in their phone for the prompt.
+  const lastCustomer = useRef(customerId);
+  useEffect(() => {
+    if (customerId === lastCustomer.current) return;
+    lastCustomer.current = customerId;
+    setMpesaPhone(customers.find((c) => c.id === customerId)?.phone ?? '');
+  }, [customerId, customers]);
+
+  if (prompt) {
+    return (
+      <MpesaPromptStatus requestId={prompt.requestId} phone={prompt.phone} onPaid={() => onDone?.()} onRetry={() => setPrompt(null)} />
+    );
+  }
+  const prompting = mpesaReady && method === 'mpesa' && mpesaPhone.trim() !== '';
   return (
     <Form {...form}>
       <form onSubmit={onSubmit} className="grid gap-5" noValidate>
@@ -963,7 +1128,8 @@ export function CustomerPaymentForm({
           presets={owed ? [{ value: centsToKesString(owed), label: `Full balance · ${formatKES(owed)}` }] : undefined}
         />
         <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
-        <SubmitButton pending={pending}>Record payment</SubmitButton>
+        {mpesaReady && method === 'mpesa' && <MpesaPhoneField value={mpesaPhone} onChange={setMpesaPhone} error={phoneError} />}
+        <SubmitButton pending={pending}>{prompting ? 'Send M-Pesa prompt' : 'Record payment'}</SubmitButton>
       </form>
     </Form>
   );

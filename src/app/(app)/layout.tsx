@@ -7,6 +7,7 @@ import { ModuleTabs } from '@/components/shell/module-tabs';
 import { SIDEBAR_COOKIE } from '@/components/shell/nav-items';
 import { getDb } from '@/db';
 import { authConfig } from '@/server/auth/config';
+import { mpesaReady } from '@/server/mpesa/payments';
 import { getShop, getStockLevels, getSupplierLogins, listCustomers, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
@@ -14,12 +15,13 @@ import { requireUser } from '@/server/session';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const db = await getDb();
-  const [shop, customers, suppliers, logins, stock, cookieStore] = await Promise.all([
+  const [shop, customers, suppliers, logins, stock, mpesaOn, cookieStore] = await Promise.all([
     getShop(db, user.shopId),
     listCustomers(db, user.shopId),
     listSuppliers(db, user.shopId),
     getSupplierLogins(db, user.shopId),
     getStockLevels(db, user.shopId),
+    mpesaReady(db, user.shopId),
     cookies(),
   ]);
   const isOwner = user.role === 'owner';
@@ -30,12 +32,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // and payables only to owners: page data is readable by whoever holds it.
   const entryData = {
     isOwner,
+    mpesaReady: mpesaOn,
     salePriceCents: shop?.salePricePerLitreCents ?? null,
     customers: customers.map((c) => ({
       id: c.id,
       name: c.name,
       balanceCents: c.balanceCents,
       creditLimitCents: c.creditLimitCents,
+      // Only owners take customer payments (and so need the number for a prompt).
+      phone: isOwner ? c.phone : null,
     })),
     suppliers: suppliers.map((s) => ({
       id: s.id,

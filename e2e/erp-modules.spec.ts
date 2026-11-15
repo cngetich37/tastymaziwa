@@ -162,3 +162,39 @@ test('a formally employed salary gets NSSF, SHIF, levy and PAYE, a payslip, and 
   await expect(card).toContainText('89750.00');
   await expect(card).toContainText('19308.35');
 });
+
+test('owner sets up M-Pesa prompts, and the counter offers them', async ({ page, request }) => {
+  await signInWithPassword(page, E2E_OWNER.email, E2E_OWNER.password);
+  await page.goto('/mpesa');
+  await expect(page.getByText('Not set up yet.')).toBeVisible();
+  await page.getByRole('button', { name: 'Set up M-Pesa' }).click();
+  await formReady(page, 'Save M-Pesa settings');
+  await page.getByRole('radio', { name: 'Paybill' }).click();
+  await page.getByLabel('Paybill number').fill('174379');
+  await page.getByLabel('Consumer key').fill('sandbox-key');
+  await page.getByLabel('Consumer secret').fill('sandbox-secret');
+  await page.getByLabel('Passkey').fill('sandbox-passkey');
+  await page.getByRole('button', { name: 'Save M-Pesa settings' }).click();
+  await expect(page.getByText('M-Pesa settings saved').first()).toBeVisible();
+  await expect(page.getByText(/Test \(sandbox\) · Paybill 174379/)).toBeVisible();
+  // The secrets never come back to the page.
+  expect(await page.content()).not.toContain('sandbox-secret');
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sale', exact: true }).click();
+  await page.getByRole('radio', { name: 'M-Pesa' }).click();
+  const phone = page.getByLabel('Send an M-Pesa prompt to');
+  await expect(phone).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Record sale' })).toBeVisible();
+  await phone.fill('0712345678');
+  await expect(page.getByRole('button', { name: 'Send M-Pesa prompt' })).toBeVisible();
+  await page.getByRole('radio', { name: 'Cash' }).click();
+  await expect(phone).toHaveCount(0);
+
+  // Safaricom's callback is public: it must not redirect to a login page, and a forged one does nothing.
+  const res = await request.post('/api/mpesa/callback/00000000-0000-4000-8000-000000000000/forged', {
+    data: { Body: { stkCallback: { CheckoutRequestID: 'ws_CO_x', ResultCode: 0 } } },
+  });
+  expect(res.status()).toBe(200);
+  expect(await res.json()).toEqual({ ResultCode: 0, ResultDesc: 'Accepted' });
+});

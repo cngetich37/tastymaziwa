@@ -8,6 +8,7 @@ import { sessionVersionProof, updateSession } from '@/auth';
 import { ALL_ROLES, OWNER, STAFF, SUPPLIER, defineAction } from '@/server/action';
 import * as accounts from '@/server/auth/accounts';
 import * as ledger from '@/server/ledger';
+import * as mpesa from '@/server/mpesa/payments';
 import {
   billSubscriptionsSchema,
   customerPaymentSchema,
@@ -19,6 +20,10 @@ import {
   inviteStaffSchema,
   inviteSupplierSchema,
   archiveProductSchema,
+  mpesaCustomerPaymentSchema,
+  mpesaRequestIdSchema,
+  mpesaSaleSchema,
+  mpesaSettingsSchema,
   reviewShiftCloseSchema,
   advanceSchema,
   attendanceSchema,
@@ -188,6 +193,28 @@ export const postPayrollAction = defineAction({ schema: postPayrollSchema, roles
 export const remitStatutoryAction = defineAction(
   { schema: remitStatutorySchema, roles: OWNER },
   ({ db, actor }, input) => ledger.remitStatutory(db, actor, input).then(idOnly),
+);
+
+// --- M-Pesa (STK Push) ---------------------------------------------------------------
+
+/** Sends the PIN prompt; the sale is recorded only when M-Pesa confirms payment. */
+export const startMpesaSaleAction = defineAction({ schema: mpesaSaleSchema, roles: STAFF }, ({ db, actor }, input) =>
+  mpesa.startMpesaSale(db, actor, input),
+);
+
+export const startMpesaCustomerPaymentAction = defineAction(
+  { schema: mpesaCustomerPaymentSchema, roles: OWNER },
+  ({ db, actor }, input) => mpesa.startMpesaCustomerPayment(db, actor, input),
+);
+
+/** Polled by the counter while the customer answers the prompt. */
+export const mpesaStatusAction = defineAction({ schema: mpesaRequestIdSchema, roles: STAFF }, ({ db, actor }, input) =>
+  mpesa.refreshMpesaRequest(db, actor, input.requestId),
+);
+
+export const saveMpesaSettingsAction = defineAction(
+  { schema: mpesaSettingsSchema, roles: OWNER },
+  ({ db, actor }, input) => mpesa.saveMpesaSettings(db, actor, input).then(() => null),
 );
 
 // --- shift close -------------------------------------------------------------------

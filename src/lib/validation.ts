@@ -86,6 +86,19 @@ const phoneField = optionalField(
   }),
 );
 
+const requiredPhone = z
+  .string({ error: 'Enter the M-Pesa phone number' })
+  .trim()
+  .min(1, 'Enter the M-Pesa phone number')
+  .transform((value, ctx) => {
+    const normalized = normalizeKenyanPhone(value);
+    if (!normalized) {
+      ctx.addIssue({ code: 'custom', message: 'Enter a Kenyan mobile number, e.g. 0712 345 678' });
+      return z.NEVER;
+    }
+    return normalized;
+  });
+
 // --- enums ------------------------------------------------------------------
 
 export const PAYMENT_METHODS = ['cash', 'mpesa', 'credit'] as const;
@@ -206,6 +219,54 @@ export const postPayrollSchema = z.object({
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Choose a month'),
   paymentMethod: z.enum(IMMEDIATE_PAYMENT_METHODS),
 });
+
+// --- M-Pesa (Lipa na M-Pesa / STK Push) ---------------------------------------------
+
+const digits = (label: string, min: number, max: number) =>
+  z
+    .string()
+    .trim()
+    .regex(/^[0-9]+$/, `${label} is digits only`)
+    .min(min, `${label} is ${min}–${max} digits`)
+    .max(max, `${label} is ${min}–${max} digits`);
+
+/** Blank secret fields keep what is saved; they are required the first time (checked in the service). */
+export const mpesaSettingsSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    environment: z.enum(['sandbox', 'production']),
+    shortcodeType: z.enum(['paybill', 'till']),
+    businessShortcode: digits('The shortcode', 5, 7),
+    tillNumber: optionalField(digits('The till number', 5, 7)),
+    accountReference: z.string().trim().min(1, 'Enter a reference, e.g. your shop name').max(12, '12 characters at most'),
+    consumerKey: optionalText(200),
+    consumerSecret: optionalText(200),
+    passkey: optionalText(200),
+  })
+  .refine((v) => v.shortcodeType !== 'till' || v.tillNumber, {
+    error: 'Enter the till number customers pay to',
+    path: ['tillNumber'],
+  });
+
+/** A sale paid by an M-Pesa prompt to the customer's phone. */
+export const mpesaSaleSchema = z.object({
+  litres: litresField(),
+  productId: optionalField(id),
+  /** Owner-only override, as for any sale. */
+  pricePerLitre: optionalField(kesField('Price per litre')),
+  customerId: optionalField(id),
+  phone: requiredPhone,
+  note: optionalText(),
+});
+
+/** A customer paying down their deni by an M-Pesa prompt. */
+export const mpesaCustomerPaymentSchema = z.object({
+  customerId: id,
+  amount: kesField(),
+  phone: requiredPhone,
+});
+
+export const mpesaRequestIdSchema = z.object({ requestId: id });
 
 // --- shift close ------------------------------------------------------------------
 
@@ -476,6 +537,9 @@ export type AttendanceInput = z.output<typeof attendanceSchema>;
 export type AdvanceInput = z.output<typeof advanceSchema>;
 export type RemitStatutoryInput = z.output<typeof remitStatutorySchema>;
 export type PostPayrollInput = z.output<typeof postPayrollSchema>;
+export type MpesaSettingsInput = z.output<typeof mpesaSettingsSchema>;
+export type MpesaSaleInput = z.output<typeof mpesaSaleSchema>;
+export type MpesaCustomerPaymentInput = z.output<typeof mpesaCustomerPaymentSchema>;
 export type ShiftCloseInput = z.output<typeof shiftCloseSchema>;
 export type ReviewShiftCloseInput = z.output<typeof reviewShiftCloseSchema>;
 export type ProductInput = z.output<typeof productSchema>;

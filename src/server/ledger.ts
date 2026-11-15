@@ -24,6 +24,7 @@ import {
   users,
   type LedgerEntry,
   type NewLedgerEntry,
+  type MpesaRequest,
   type PayType,
   type Role,
 } from '@/db/schema';
@@ -137,7 +138,7 @@ async function insertEntry(tx: Tx, actor: Actor, values: Omit<NewLedgerEntry, 's
   return entry;
 }
 
-async function assertCustomer(tx: Tx, actor: Actor, customerId: string) {
+export async function assertCustomer(tx: Tx, actor: Actor, customerId: string) {
   const [row] = await tx
     .select({
       id: customers.id,
@@ -214,22 +215,34 @@ function resolvePrice(
 
 // --- ledger entries ---------------------------------------------------------
 
+/**
+ * The price and total of a sale, by the same rules for every way of selling
+ * (counter, M-Pesa prompt): the owner's price, which only the owner may change.
+ */
+export async function quoteSale(
+  tx: Tx,
+  actor: Actor,
+  input: { litres: number; productId?: string; pricePerLitre?: number },
+) {
+  const product = input.productId ? await assertProduct(tx, actor, input.productId) : null;
+  const price = product
+    ? resolvePrice(actor, input.pricePerLitre, product.salePriceCents, {
+        manager: `Set ${product.name}'s selling price first, or type a price`,
+        staff: `The owner has not set ${product.name}'s price yet`,
+      })
+    : resolvePrice(actor, input.pricePerLitre, await shopSalePrice(tx, actor), {
+        manager: 'Set your selling price in Settings first, or type a price',
+        staff: 'The owner has not set a selling price yet',
+      });
+  return { product, price, amountCents: lineTotalCents(input.litres, price) };
+}
+
 export function recordSale(db: DB, actor: Actor, input: SaleInput) {
   return db.transaction(async (tx) => {
     const businessDate = entryDateFor(actor, input.date);
     const customer = input.customerId ? await assertCustomer(tx, actor, input.customerId) : null;
-    const product = input.productId ? await assertProduct(tx, actor, input.productId) : null;
-    const price = product
-      ? resolvePrice(actor, input.pricePerLitre, product.salePriceCents, {
-          manager: `Set ${product.name}'s selling price first, or type a price`,
-          staff: `The owner has not set ${product.name}'s price yet`,
-        })
-      : resolvePrice(actor, input.pricePerLitre, await shopSalePrice(tx, actor), {
-          manager: 'Set your selling price in Settings first, or type a price',
-          staff: 'The owner has not set a selling price yet',
-        });
+    const { product, price, amountCents } = await quoteSale(tx, actor, input);
     const isCredit = input.paymentMethod === 'credit';
-    const amountCents = lineTotalCents(input.litres, price);
     if (isCredit && customer && !isManager(actor)) {
       const balance = await customerBalance(tx, actor, customer.id);
       if (overCreditLimit(balance, amountCents, customer.creditLimitCents)) {
@@ -1278,5 +1291,31 @@ export function remitStatutory(db: DB, actor: Actor, input: RemitStatutoryInput)
       .returning();
     await audit(tx, actor, 'payroll.remit', 'payroll_run', run.id, { amountCents: run.statutoryDueCents });
     return updated;
+  });
+}
+
+// --- M-Pesa (STK Push) ---------------------------------------------------------------
+
+/**
+ * Post a confirmed M-Pesa prompt to the ledger: the sale or customer payment
+ * it was for, at the amount and price fixed when it was sent. Called inside
+ * the transaction that marks the request paid; keyed by request, so it can
+ * only ever post once.
+ */
+export async function postMpesaRequest(tx: Tx, request: MpesaRequest, receiptNumber: string | null) {
+  // Recorded on behalf of whoever sent the prompt, with the price already settled.
+  const actor: Actor = { id: request.createdBy, role: 'system', shopId: request.shopId };
+  const note = [receiptNumber ? `M-Pesa ${receiptNumber}` : 'M-Pesa', request.note].filter(Boolean).join(' · ');
+  return insertEntry(tx, actor, {
+    kind: request.purpose === 'sale' ? 'sale' : 'customer_payment',
+    businessDate: request.businessDate,
+    productId: request.productId,
+    volumeMl: request.purpose === 'sale' ? request.volumeMl : 0,
+    unitPriceCents: request.purpose === 'sale' ? request.unitPriceCents : null,
+    amountCents: request.amountCents,
+    paymentMethod: 'mpesa',
+    customerId: request.customerId,
+    note,
+    idempotencyKey: `mpesa:${request.id}`,
   });
 }

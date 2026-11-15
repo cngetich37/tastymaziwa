@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { CheckCircle2, Target } from 'lucide-react';
 import { FormDialog } from '@/components/form-dialog';
-import { BudgetsForm, PaySuppliersForm, type PayableSupplier } from '@/components/forms/entry-forms';
+import {
+  BudgetsForm,
+  MpesaSettingsForm,
+  PaySuppliersForm,
+  type MpesaSettingsSummary,
+  type PayableSupplier,
+} from '@/components/forms/entry-forms';
 import { Button } from '@/components/ui/button';
 import { formatKES } from '@/lib/money';
 
@@ -50,6 +56,18 @@ export function BudgetsButton({ budgets }: { budgets: Record<string, number | nu
       description="What you plan to spend each month per category. Leave blank for no budget."
     >
       {(close) => <BudgetsForm budgets={budgets} onDone={close} />}
+    </FormDialog>
+  );
+}
+
+export function MpesaSettingsButton({ saved, shopName }: { saved: MpesaSettingsSummary | null; shopName: string }) {
+  return (
+    <FormDialog
+      trigger={<Button className="h-11">{saved ? 'Edit M-Pesa' : 'Set up M-Pesa'}</Button>}
+      title="Lipa na M-Pesa prompts"
+      description="Your own Daraja app's keys, from developer.safaricom.co.ke. They are stored encrypted and never shown again."
+    >
+      {(close) => <MpesaSettingsForm saved={saved} shopName={shopName} onDone={close} />}
     </FormDialog>
   );
 }

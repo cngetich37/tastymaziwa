@@ -562,6 +562,98 @@ export const employeeAdvances = pgTable(
   ],
 );
 
+export const mpesaEnvironmentEnum = pgEnum('mpesa_environment', ['sandbox', 'production']);
+export const mpesaShortcodeTypeEnum = pgEnum('mpesa_shortcode_type', ['paybill', 'till']);
+export const mpesaPurposeEnum = pgEnum('mpesa_purpose', ['sale', 'customer_payment']);
+export const mpesaStatusEnum = pgEnum('mpesa_status', ['pending', 'succeeded', 'failed']);
+
+/**
+ * A shop's own Lipa na M-Pesa (Daraja) credentials. Secrets are stored
+ * encrypted (AES-256-GCM, see server/mpesa/crypto.ts) and never sent to a
+ * browser.
+ */
+export const mpesaSettings = pgTable('mpesa_settings', {
+  shopId: uuid('shop_id')
+    .primaryKey()
+    .references(() => shops.id),
+  enabled: boolean('enabled').notNull().default(true),
+  environment: mpesaEnvironmentEnum('environment').notNull().default('sandbox'),
+  shortcodeType: mpesaShortcodeTypeEnum('shortcode_type').notNull(),
+  /** Paybill number, or for a till the head office (store) number. */
+  businessShortcode: text('business_shortcode').notNull(),
+  /** Buy Goods till number (tills only). */
+  tillNumber: text('till_number'),
+  /** Shown to the customer on the PIN prompt (12 characters at most). */
+  accountReference: text('account_reference').notNull(),
+  consumerKeyEnc: text('consumer_key_enc').notNull(),
+  consumerSecretEnc: text('consumer_secret_enc').notNull(),
+  passkeyEnc: text('passkey_enc').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * One STK Push (PIN prompt) sent to a customer's phone. Nothing reaches the
+ * ledger until M-Pesa confirms it; then the sale or payment is posted once.
+ */
+export const mpesaRequests = pgTable(
+  'mpesa_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    purpose: mpesaPurposeEnum('purpose').notNull(),
+    status: mpesaStatusEnum('status').notNull().default('pending'),
+    /** Whole shillings, in cents. */
+    amountCents: cents('amount_cents').notNull(),
+    /** E.164, e.g. +254712345678 */
+    phone: text('phone').notNull(),
+    businessDate: date('business_date').notNull(),
+    customerId: uuid('customer_id'),
+    productId: uuid('product_id'),
+    volumeMl: millilitres('volume_ml').notNull().default(0),
+    unitPriceCents: cents('unit_price_cents'),
+    note: text('note'),
+    /** HMAC of the secret in this request's callback URL. */
+    callbackTokenHash: text('callback_token_hash').notNull(),
+    merchantRequestId: text('merchant_request_id'),
+    checkoutRequestId: text('checkout_request_id').unique(),
+    resultCode: integer('result_code'),
+    resultDesc: text('result_desc'),
+    receiptNumber: text('receipt_number').unique(),
+    ledgerEntryId: uuid('ledger_entry_id'),
+    createdBy: uuid('created_by').references(() => users.id),
+    createdAt: createdAt(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('mpesa_requests_shop_created_idx').on(t.shopId, t.createdAt),
+    index('mpesa_requests_shop_phone_status_idx').on(t.shopId, t.phone, t.status),
+    foreignKey({
+      name: 'mpesa_requests_customer_same_shop_fk',
+      columns: [t.customerId, t.shopId],
+      foreignColumns: [customers.id, customers.shopId],
+    }),
+    foreignKey({
+      name: 'mpesa_requests_product_same_shop_fk',
+      columns: [t.productId, t.shopId],
+      foreignColumns: [products.id, products.shopId],
+    }),
+    foreignKey({
+      name: 'mpesa_requests_ledger_same_shop_fk',
+      columns: [t.ledgerEntryId, t.shopId],
+      foreignColumns: [ledgerEntries.id, ledgerEntries.shopId],
+    }),
+    check('mpesa_requests_whole_shillings', sql`${t.amountCents} > 0 and ${t.amountCents} % 100 = 0`),
+    check(
+      'mpesa_requests_payment_has_customer',
+      sql`${t.purpose} <> 'customer_payment' or ${t.customerId} is not null`,
+    ),
+    check(
+      'mpesa_requests_success_posted',
+      sql`${t.status} <> 'succeeded' or ${t.ledgerEntryId} is not null`,
+    ),
+  ],
+);
+
 /** Who did what, when. Written in the same transaction as the change. */
 export const auditLog = pgTable(
   'audit_log',
@@ -628,6 +720,8 @@ export type DeliverySubmissionStatus = (typeof deliverySubmissionStatusEnum.enum
 export type ShiftClose = typeof shiftCloses.$inferSelect;
 export type Employee = typeof employees.$inferSelect;
 export type PayType = (typeof payTypeEnum.enumValues)[number];
+export type MpesaSettings = typeof mpesaSettings.$inferSelect;
+export type MpesaRequest = typeof mpesaRequests.$inferSelect;
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
 export type AuthTokenPurpose = (typeof authTokenPurposeEnum.enumValues)[number];

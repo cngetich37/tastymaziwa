@@ -62,6 +62,7 @@ src/
     auth-actions.ts   signed-out server actions (definePublicAction): sign-up, codes, reset
     api/auth/         Auth.js handlers
     api/cron/         bill-subscriptions (Bearer CRON_SECRET), for a scheduler
+    api/mpesa/        callback/[id]/[token]: Safaricom STK Push results (per-request secret)
   db/
     schema.ts         single source of truth for tables → `npm run db:generate`
     client.ts         createDb/migrateDb (usable from scripts and tests)
@@ -75,6 +76,8 @@ src/
     session.ts        currentUser / requireUser(roles) -> { id, role, shopId, ... }
     auth/             accounts.ts (all auth flows), tokens.ts (codes/links),
                       rate-limit.ts, mailer.ts, emails.ts, config.ts
+    mpesa/            daraja.ts (Daraja client, fetch injectable), crypto.ts (credential
+                      encryption, callback secrets), payments.ts (prompts, callback, status)
     users.ts, password.ts
   lib/                isomorphic and pure: safe on the client
     money.ts          cents/millilitre parsing, line totals, formatting
@@ -162,7 +165,7 @@ The database enforces these rules. Don't work around them:
 - Actions are thin: they call a service in `src/server/ledger.ts` or `src/server/auth/accounts.ts`. Services take `(db, actor, input)` (the actor carries `shopId`), run in `db.transaction`, and write an `audit_log` row.
 - Signed-out actions go in `src/app/auth-actions.ts` with `definePublicAction`, and must rate-limit.
 - Business-rule failures throw `DomainError`; its message is shown to the user. Anything else is logged and gets a generic error.
-- **Route handlers only for external callers** (cron, future M-Pesa callbacks). They do their own auth: a bearer secret compared with `timingSafeEqual`, or a signature check.
+- **Route handlers only for external callers** (cron, M-Pesa callbacks). An M-Pesa prompt posts to the ledger only from `settle()` in `server/mpesa/payments.ts`, via `postMpesaRequest` (idempotency key `mpesa:<requestId>`). They do their own auth: a bearer secret compared with `timingSafeEqual`, or a signature check.
 - Roles (`src/lib/roles.ts`; the UI calls them Owner, Seller, Supplier): a **supplier** login is linked to one `suppliers` row (`users.supplier_id`, enforced by a CHECK) and only uses `/supply`: it records litres delivered (`submitDelivery`, dated today, for its own supplier only) and sees its own deliveries and payable. It never writes the ledger. Its deliveries reach the ledger only when a seller or owner approves them (`reviewDelivery`, once, never by the submitter); rejecting needs a reason. `requireUser()` defaults to `STAFF` and redirects other roles to `homeFor(role)`, so shop pages are closed to suppliers by default; supplier pages pass `SUPPLIER`.
 - An **attendant** (seller) records sales, approves supplier deliveries, and types in deliveries only for suppliers without their own login: litres, payment method and (for credit) the customer, dated today. Prices come from the owner: the shop's selling price (`shops.sale_price_per_litre_cents`, set in Settings) and each supplier's agreed price. Attendants never see buying prices, delivery costs, profit, customers' or suppliers' pages, or the ledger. An **owner** does everything else: sets prices (and may override the price of one entry), records payments, spoilage and expenses, dates entries on past days, reverses entries, and manages customers, suppliers, subscriptions and users.
 - **Prices and dates are enforced in the services** (`resolvePrice` / `entryDateFor` in `server/ledger.ts`), not only hidden in the UI. Page data for attendants must not carry costs either (see `app/(app)/layout.tsx`).
