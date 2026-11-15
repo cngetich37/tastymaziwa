@@ -13,6 +13,7 @@ import {
   createEmployeeAction,
   giveAdvanceAction,
   postPayrollAction,
+  remitStatutoryAction,
   updateEmployeeAction,
   paySuppliersAction,
   setBudgetsAction,
@@ -49,6 +50,7 @@ import {
   advanceSchema,
   employeeSchema,
   postPayrollSchema,
+  remitStatutorySchema,
   updateEmployeeSchema,
   budgetsSchema,
   paySuppliersSchema,
@@ -63,7 +65,7 @@ import {
   updateProductSchema,
   updateSupplierSchema,
 } from '@/lib/validation';
-import { ChoiceField, SelectField, SubmitButton, TextField, type Option, type Preset } from './fields';
+import { CheckboxField, ChoiceField, SelectField, SubmitButton, TextField, type Option, type Preset } from './fields';
 import { useActionForm } from './use-action-form';
 
 export interface CustomerOption {
@@ -540,6 +542,10 @@ export interface EmployeeDetails {
   payType: 'daily' | 'monthly';
   rateCents: number;
   startDate: string;
+  statutory: boolean;
+  kraPin: string | null;
+  nssfNumber: string | null;
+  shaNumber: string | null;
 }
 
 const PAY_TYPE_OPTIONS: Option[] = [
@@ -548,7 +554,7 @@ const PAY_TYPE_OPTIONS: Option[] = [
 ];
 
 function EmployeeFields() {
-  const payType = useFormContext().watch('payType');
+  const [payType, statutory] = useFormContext().watch(['payType', 'statutory']);
   return (
     <>
       <TextField name="name" label="Name" />
@@ -561,6 +567,18 @@ function EmployeeFields() {
         description={payType === 'monthly' ? 'Prorated in the month they start.' : 'Paid for each day marked present.'}
       />
       <TextField name="startDate" label="Started on" kind="date" description="Defaults to today." />
+      <CheckboxField
+        name="statutory"
+        label="Formally employed"
+        description="Deduct NSSF, SHIF, the housing levy and PAYE from their pay."
+      />
+      {statutory && (
+        <>
+          <TextField name="kraPin" label="KRA PIN (optional)" placeholder="A123456789B" />
+          <TextField name="nssfNumber" label="NSSF number (optional)" />
+          <TextField name="shaNumber" label="SHA number (optional)" />
+        </>
+      )}
     </>
   );
 }
@@ -569,7 +587,17 @@ export function EmployeeForm({ onDone }: FormProps) {
   const { form, onSubmit, pending } = useActionForm(
     employeeSchema,
     createEmployeeAction,
-    { name: '', phone: '', payType: 'daily', rate: '', startDate: '' },
+    {
+      name: '',
+      phone: '',
+      payType: 'daily',
+      rate: '',
+      startDate: '',
+      statutory: false,
+      kraPin: '',
+      nssfNumber: '',
+      shaNumber: '',
+    },
     { success: 'Added to the team', onSuccess: onDone },
   );
   return (
@@ -593,6 +621,10 @@ export function EditEmployeeForm({ employee, onDone }: FormProps & { employee: E
       payType: employee.payType,
       rate: centsToKesString(employee.rateCents),
       startDate: employee.startDate,
+      statutory: employee.statutory,
+      kraPin: employee.kraPin ?? '',
+      nssfNumber: employee.nssfNumber ?? '',
+      shaNumber: employee.shaNumber ?? '',
     },
     { success: 'Saved', onSuccess: onDone, keepValues: true },
   );
@@ -621,6 +653,25 @@ export function AdvanceForm({ employeeId, name, onDone }: FormProps & { employee
         <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
         <TextField name="note" label="Note (optional)" />
         <SubmitButton pending={pending}>Give advance</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+/** Record paying the month's deductions over to KRA, NSSF and SHA. */
+export function RemitStatutoryForm({ runId, dueCents, onDone }: FormProps & { runId: string; dueCents: number }) {
+  const { form, onSubmit, pending } = useActionForm(
+    remitStatutorySchema,
+    remitStatutoryAction,
+    { runId, paymentMethod: 'mpesa' },
+    { success: 'Statutory payment recorded', onSuccess: onDone },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
+        <TotalLine cents={dueCents} detail="Recorded as a statutory expense." />
+        <SubmitButton pending={pending}>Record payment of {formatKES(dueCents)}</SubmitButton>
       </form>
     </Form>
   );

@@ -35,6 +35,7 @@ export default async function StaffPage() {
         <span className="flex flex-wrap items-center gap-2">
           {e.name}
           {!e.active && <Badge variant="secondary">Left</Badge>}
+          {e.statutory && <Badge variant="outline">Formal</Badge>}
         </span>
       ),
     },
@@ -54,7 +55,18 @@ export default async function StaffPage() {
       cell: (e) => (
         <EmployeeActions
           active={e.active}
-          employee={{ id: e.id, name: e.name, phone: e.phone, payType: e.payType, rateCents: e.rateCents, startDate: e.startDate }}
+          employee={{
+            id: e.id,
+            name: e.name,
+            phone: e.phone,
+            payType: e.payType,
+            rateCents: e.rateCents,
+            startDate: e.startDate,
+            statutory: e.statutory,
+            kraPin: e.kraPin,
+            nssfNumber: e.nssfNumber,
+            shaNumber: e.shaNumber,
+          }}
         />
       ),
     },

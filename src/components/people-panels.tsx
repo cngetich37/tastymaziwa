@@ -9,6 +9,7 @@ import {
   EditEmployeeForm,
   EmployeeForm,
   PostPayrollForm,
+  RemitStatutoryForm,
   type EmployeeDetails,
 } from '@/components/forms/entry-forms';
 import { Button } from '@/components/ui/button';
@@ -127,6 +128,18 @@ export function PostPayrollButton({ month, monthLabel, netCents }: { month: stri
       description="This can only be done once per month."
     >
       {(close) => <PostPayrollForm month={month} netCents={netCents} onDone={close} />}
+    </FormDialog>
+  );
+}
+
+export function RemitStatutoryButton({ runId, dueCents, monthLabel }: { runId: string; dueCents: number; monthLabel: string }) {
+  return (
+    <FormDialog
+      trigger={<Button className="h-11">Record payment</Button>}
+      title={`Statutory deductions for ${monthLabel}`}
+      description="Once you have paid NSSF, SHIF, the housing levy and PAYE over (via iTax / e-Citizen)."
+    >
+      {(close) => <RemitStatutoryForm runId={runId} dueCents={dueCents} onDone={close} />}
     </FormDialog>
   );
 }

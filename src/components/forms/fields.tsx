@@ -248,3 +248,36 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
     </Button>
   );
 }
+
+/** A yes/no option as a full-width, thumb-sized row. */
+export function CheckboxField({ name, label, description }: BaseProps) {
+  const { control } = useFormContext();
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3">
+            <FormControl>
+              <input
+                type="checkbox"
+                checked={Boolean(field.value)}
+                onChange={(e) => field.onChange(e.target.checked)}
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+                className="mt-0.5 size-5 shrink-0 accent-[hsl(var(--primary))]"
+              />
+            </FormControl>
+            <span className="grid gap-0.5">
+              <span className="text-sm font-medium">{label}</span>
+              {description && <span className="text-xs text-muted-foreground">{description}</span>}
+            </span>
+          </label>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+}

@@ -79,7 +79,8 @@ src/
   lib/                isomorphic and pure: safe on the client
     money.ts          cents/millilitre parsing, line totals, formatting
     dates.ts          Africa/Nairobi business dates
-    calc/             summarize, balances, dailySeries, FIFO credit allocation,
+    calc/             summarize, balances, dailySeries, FIFO credit allocation, close, finance,
+                      payroll, statutory (Kenyan NSSF/SHIF/levy/PAYE rates: add dated rows when they change),
                       reports (date ranges, ageing, margin per litre, CSV)
     roles.ts          STAFF / OWNER / SUPPLIER / ALL_ROLES, homeFor(role), labels
     validation.ts     Zod schemas + Kenyan phone normalisation

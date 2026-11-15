@@ -101,7 +101,10 @@ Mark each item done with `[x]` as it ships.
 - [x] **Attendance**: one tap per person per day.
 - [x] **Advances**: paid out at once as a `wages` expense (so the shift close counts it), deducted at payroll.
 - [x] **Monthly payroll** (`/payroll`): days × rate or prorated salary, less advances (excess carried forward); net pay posted as wages; once per month.
-- [ ] Payslips (printable / WhatsApp) and NSSF/SHIF/PAYE deductions if staff are formally employed.
+- [x] **Statutory deductions** for staff marked "formally employed": NSSF (6% + 6%, Tier I/II limits by effective month), SHIF (2.75%, min KES 300), Affordable Housing Levy (1.5% + 1.5%) and PAYE (monthly bands, after those deductions, less KES 2,400 relief). Rates live in `lib/calc/statutory.ts` as dated tables. Amounts owed are tracked per payroll and recorded as a `statutory` expense when paid over (due by the 9th).
+- [x] **Payslips** (`/payroll/[runId]/payslips`): one per person, printable (one per page) or sent by WhatsApp.
+- [ ] Check rates against KRA / NSSF / SHA each February and July (Finance Act); add rows to `NSSF_SCHEDULE` / `PAYE_BANDS`, don't edit old ones.
+- [ ] P9 year-end tax card and iTax PAYE CSV export.
 
 ## P2: Standout features
 

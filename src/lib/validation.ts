@@ -98,6 +98,8 @@ export const EXPENSE_CATEGORIES = [
   'rent',
   'wages',
   'equipment',
+  /** NSSF, SHIF, housing levy and PAYE paid over (see Payroll). */
+  'statutory',
   'other',
 ] as const;
 
@@ -166,6 +168,17 @@ export const employeeSchema = z.object({
   rate: kesFieldAllowZero('Pay rate'),
   /** Defaults to today. */
   startDate: optionalField(isoDate),
+  /** Formally employed: NSSF, SHIF, housing levy and PAYE apply. */
+  statutory: z.boolean().default(false),
+  kraPin: optionalField(
+    z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[AP]\d{9}[A-Z]$/, 'A KRA PIN looks like A123456789B'),
+  ),
+  nssfNumber: optionalText(30),
+  shaNumber: optionalText(30),
 });
 
 export const updateEmployeeSchema = employeeSchema.extend({ employeeId: id });
@@ -182,6 +195,11 @@ export const advanceSchema = z.object({
   amount: kesField(),
   paymentMethod: z.enum(IMMEDIATE_PAYMENT_METHODS),
   note: optionalText(),
+});
+
+export const remitStatutorySchema = z.object({
+  runId: id,
+  paymentMethod: z.enum(IMMEDIATE_PAYMENT_METHODS),
 });
 
 export const postPayrollSchema = z.object({
@@ -456,6 +474,7 @@ export type EmployeeInput = z.output<typeof employeeSchema>;
 export type UpdateEmployeeInput = z.output<typeof updateEmployeeSchema>;
 export type AttendanceInput = z.output<typeof attendanceSchema>;
 export type AdvanceInput = z.output<typeof advanceSchema>;
+export type RemitStatutoryInput = z.output<typeof remitStatutorySchema>;
 export type PostPayrollInput = z.output<typeof postPayrollSchema>;
 export type ShiftCloseInput = z.output<typeof shiftCloseSchema>;
 export type ReviewShiftCloseInput = z.output<typeof reviewShiftCloseSchema>;

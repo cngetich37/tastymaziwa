@@ -414,6 +414,11 @@ export const employees = pgTable(
     /** Per day worked (daily) or per month (monthly). */
     rateCents: cents('rate_cents').notNull(),
     startDate: date('start_date').notNull(),
+    /** Formally employed: NSSF, SHIF, housing levy and PAYE are deducted. */
+    statutory: boolean('statutory').notNull().default(false),
+    kraPin: text('kra_pin'),
+    nssfNumber: text('nssf_number'),
+    shaNumber: text('sha_number'),
     active: boolean('active').notNull().default(true),
     createdAt: createdAt(),
   },
@@ -460,6 +465,10 @@ export const payrollRuns = pgTable(
     grossCents: cents('gross_cents').notNull(),
     advancesCents: cents('advances_cents').notNull(),
     netCents: cents('net_cents').notNull(),
+    /** Employee deductions + employer contributions owed to KRA / NSSF / SHA. */
+    statutoryDueCents: cents('statutory_due_cents').notNull().default(0),
+    remittedAt: timestamp('remitted_at', { withTimezone: true }),
+    remittanceEntryId: uuid('remittance_entry_id'),
     postedBy: uuid('posted_by').references(() => users.id),
     postedAt: timestamp('posted_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -467,6 +476,11 @@ export const payrollRuns = pgTable(
     unique('payroll_runs_id_shop_unique').on(t.id, t.shopId),
     unique('payroll_runs_shop_month_unique').on(t.shopId, t.month),
     check('payroll_runs_method', sql`${t.paymentMethod} in ('cash', 'mpesa')`),
+    foreignKey({
+      name: 'payroll_runs_remittance_same_shop_fk',
+      columns: [t.remittanceEntryId, t.shopId],
+      foreignColumns: [ledgerEntries.id, ledgerEntries.shopId],
+    }),
   ],
 );
 
@@ -481,6 +495,13 @@ export const payrollLines = pgTable(
     grossCents: cents('gross_cents').notNull(),
     advancesCents: cents('advances_cents').notNull(),
     netCents: cents('net_cents').notNull(),
+    nssfCents: cents('nssf_cents').notNull().default(0),
+    shifCents: cents('shif_cents').notNull().default(0),
+    housingLevyCents: cents('housing_levy_cents').notNull().default(0),
+    taxableCents: cents('taxable_cents').notNull().default(0),
+    payeCents: cents('paye_cents').notNull().default(0),
+    employerNssfCents: cents('employer_nssf_cents').notNull().default(0),
+    employerHousingLevyCents: cents('employer_housing_levy_cents').notNull().default(0),
     /** The wages expense for the net pay; null when nothing was left to pay. */
     ledgerEntryId: uuid('ledger_entry_id'),
   },

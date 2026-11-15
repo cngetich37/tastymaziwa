@@ -101,3 +101,41 @@ test('owner adds a day worker, marks them in, gives an advance and pays the mont
   await expect(page.getByText('Payroll paid: Ksh 300').first()).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Paid Ksh 300' }).first()).toBeVisible();
 });
+
+test('a formally employed salary gets NSSF, SHIF, levy and PAYE, a payslip, and a remittance', async ({ page }) => {
+  await signInWithPassword(page, E2E_OWNER.email, E2E_OWNER.password);
+  await page.goto('/staff');
+  await page.getByRole('button', { name: 'Staff member' }).click();
+  await formReady(page, 'Add staff member');
+  await page.getByLabel('Name').fill('Wanjiku');
+  await page.getByRole('radio', { name: 'Per month' }).click();
+  await page.getByLabel('Salary per month').fill('100000');
+  await page.getByLabel('Started on').fill('2025-01-01');
+  await page.getByLabel('Formally employed').check();
+  await page.getByLabel('KRA PIN (optional)').fill('A123456789B');
+  await page.getByRole('button', { name: 'Add staff member' }).click();
+  await expect(page.getByText('Added to the team').first()).toBeVisible();
+
+  // Last month: KES 100,000 less NSSF 6,000, SHIF 2,750, levy 1,500 and PAYE 19,308.35.
+  await page.goto('/payroll');
+  await page.getByRole('link', { name: 'Previous month' }).click();
+  await expect(page).toHaveURL(/month=/);
+  await page.getByRole('button', { name: 'Pay Ksh 70,441.65' }).click();
+  await formReady(page, 'Pay Ksh 70,441.65');
+  await page.getByRole('dialog').getByRole('button', { name: 'Pay Ksh 70,441.65' }).click();
+  await expect(page.getByText('Payroll paid').first()).toBeVisible();
+
+  const statutory = page.getByRole('region', { name: 'Statutory deductions' });
+  await expect(statutory).toContainText('Ksh 19,308.35');
+  await expect(statutory).toContainText('not paid over yet');
+  await statutory.getByRole('button', { name: 'Record payment' }).click();
+  await formReady(page, 'Record payment of Ksh 37,058.35');
+  await page.getByRole('button', { name: 'Record payment of Ksh 37,058.35' }).click();
+  await expect(page.getByText('Statutory payment recorded').first()).toBeVisible();
+  await expect(statutory).toContainText('paid over on');
+
+  await page.getByRole('link', { name: 'Payslips' }).click();
+  const slip = page.getByRole('region', { name: 'Payslip for Wanjiku' });
+  await expect(slip).toContainText('KRA PIN A123456789B');
+  await expect(slip).toContainText('Ksh 70,441.65');
+});

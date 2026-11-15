@@ -788,6 +788,8 @@ export async function listPayrollRuns(db: DB, shopId: string) {
         grossCents: payrollRuns.grossCents,
         advancesCents: payrollRuns.advancesCents,
         netCents: payrollRuns.netCents,
+        statutoryDueCents: payrollRuns.statutoryDueCents,
+        remittedAt: payrollRuns.remittedAt,
         postedAt: payrollRuns.postedAt,
         postedByName: users.name,
       })
@@ -804,6 +806,10 @@ export async function listPayrollRuns(db: DB, shopId: string) {
         grossCents: payrollLines.grossCents,
         advancesCents: payrollLines.advancesCents,
         netCents: payrollLines.netCents,
+        nssfCents: payrollLines.nssfCents,
+        shifCents: payrollLines.shifCents,
+        housingLevyCents: payrollLines.housingLevyCents,
+        payeCents: payrollLines.payeCents,
       })
       .from(payrollLines)
       .innerJoin(employees, eq(employees.id, payrollLines.employeeId))
@@ -812,6 +818,53 @@ export async function listPayrollRuns(db: DB, shopId: string) {
   ]);
   return runs.map((r) => ({ ...r, lines: lines.filter((l) => l.runId === r.id) }));
 }
+
+/**
+ * Payslips for one payroll run (optionally one person): everything a
+ * payslip shows, including the employer's own contributions.
+ */
+export async function getPayslips(db: DB, shopId: string, runId: string, employeeId?: string) {
+  const [run] = await db
+    .select()
+    .from(payrollRuns)
+    .where(and(eq(payrollRuns.id, runId), eq(payrollRuns.shopId, shopId)));
+  if (!run) return null;
+  const lines = await db
+    .select({
+      employeeId: employees.id,
+      name: employees.name,
+      phone: employees.phone,
+      payType: employees.payType,
+      rateCents: employees.rateCents,
+      kraPin: employees.kraPin,
+      nssfNumber: employees.nssfNumber,
+      shaNumber: employees.shaNumber,
+      daysWorked: payrollLines.daysWorked,
+      grossCents: payrollLines.grossCents,
+      nssfCents: payrollLines.nssfCents,
+      shifCents: payrollLines.shifCents,
+      housingLevyCents: payrollLines.housingLevyCents,
+      taxableCents: payrollLines.taxableCents,
+      payeCents: payrollLines.payeCents,
+      advancesCents: payrollLines.advancesCents,
+      netCents: payrollLines.netCents,
+      employerNssfCents: payrollLines.employerNssfCents,
+      employerHousingLevyCents: payrollLines.employerHousingLevyCents,
+    })
+    .from(payrollLines)
+    .innerJoin(employees, and(eq(employees.id, payrollLines.employeeId), eq(employees.shopId, payrollLines.shopId)))
+    .where(
+      and(
+        eq(payrollLines.shopId, shopId),
+        eq(payrollLines.runId, run.id),
+        employeeId ? eq(payrollLines.employeeId, employeeId) : undefined,
+      ),
+    )
+    .orderBy(employees.name);
+  return { run, lines };
+}
+
+export type Payslip = NonNullable<Awaited<ReturnType<typeof getPayslips>>>['lines'][number];
 
 // --- shop ---------------------------------------------------------------------
 

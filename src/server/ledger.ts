@@ -39,6 +39,7 @@ import type {
   BudgetsInput,
   EmployeeInput,
   PostPayrollInput,
+  RemitStatutoryInput,
   UpdateEmployeeInput,
   CustomerPaymentInput,
   PaySuppliersInput,
@@ -976,6 +977,10 @@ export function createEmployee(db: DB, actor: Actor, input: EmployeeInput) {
         payType: input.payType,
         rateCents: input.rate,
         startDate: input.startDate ?? todayBusinessDate(),
+        statutory: input.statutory,
+        kraPin: input.kraPin ?? null,
+        nssfNumber: input.nssfNumber ?? null,
+        shaNumber: input.shaNumber ?? null,
       })
       .returning();
     await audit(tx, actor, 'employee.create', 'employee', employee.id, input);
@@ -995,6 +1000,10 @@ export function updateEmployee(db: DB, actor: Actor, input: UpdateEmployeeInput)
         payType: input.payType,
         rateCents: input.rate,
         startDate: input.startDate ?? before.startDate,
+        statutory: input.statutory,
+        kraPin: input.kraPin ?? null,
+        nssfNumber: input.nssfNumber ?? null,
+        shaNumber: input.shaNumber ?? null,
       })
       .where(and(eq(employees.id, input.employeeId), eq(employees.shopId, actor.shopId)))
       .returning();
@@ -1080,6 +1089,7 @@ export interface PayrollPreviewLine extends PayLine {
   name: string;
   payType: PayType;
   rateCents: number;
+  statutory: boolean;
 }
 
 /**
@@ -1117,6 +1127,7 @@ export async function payrollPreview(q: DB | Tx, shopId: string, month: string):
       name: e.name,
       payType: e.payType,
       rateCents: e.rateCents,
+      statutory: e.statutory,
       ...computePay(
         {
           payType: e.payType,
@@ -1125,6 +1136,7 @@ export async function payrollPreview(q: DB | Tx, shopId: string, month: string):
           startDate: e.startDate,
           daysWorked: daysOf.get(e.id) ?? 0,
           advancesCents: advancesOf.get(e.id) ?? 0,
+          statutory: e.statutory,
         },
         { from, lastDay },
       ),
@@ -1154,7 +1166,7 @@ export function postPayroll(db: DB, actor: Actor, input: PostPayrollInput) {
     );
     if (lines.length === 0) throw new DomainError('Nobody is due any pay for this month');
 
-    const sum = (k: 'grossCents' | 'advancesCents' | 'netCents') => lines.reduce((n, l) => n + l[k], 0);
+    const sum = (k: keyof PayLine) => lines.reduce((n, l) => n + l[k], 0);
     const [run] = await tx
       .insert(payrollRuns)
       .values({
@@ -1164,6 +1176,7 @@ export function postPayroll(db: DB, actor: Actor, input: PostPayrollInput) {
         grossCents: sum('grossCents'),
         advancesCents: sum('advancesCents'),
         netCents: sum('netCents'),
+        statutoryDueCents: sum('employeeTotalCents') + sum('employerNssfCents') + sum('employerHousingLevyCents'),
         postedBy: actor.id,
       })
       .returning();
@@ -1191,6 +1204,13 @@ export function postPayroll(db: DB, actor: Actor, input: PostPayrollInput) {
         grossCents: line.grossCents,
         advancesCents: line.advancesCents,
         netCents: line.netCents,
+        nssfCents: line.nssfCents,
+        shifCents: line.shifCents,
+        housingLevyCents: line.housingLevyCents,
+        taxableCents: line.taxableCents,
+        payeCents: line.payeCents,
+        employerNssfCents: line.employerNssfCents,
+        employerHousingLevyCents: line.employerHousingLevyCents,
         ledgerEntryId: entry?.id ?? null,
       });
       await tx
@@ -1221,5 +1241,40 @@ export function postPayroll(db: DB, actor: Actor, input: PostPayrollInput) {
       netCents: run.netCents,
     });
     return run;
+  });
+}
+
+/**
+ * Record paying the month's NSSF, SHIF, housing levy and PAYE over to the
+ * authorities (due by the 9th of the next month). Posted then, not at
+ * payroll, so cash counts stay true until the money actually leaves.
+ */
+export function remitStatutory(db: DB, actor: Actor, input: RemitStatutoryInput) {
+  return db.transaction(async (tx) => {
+    ownerOnly(actor, 'records statutory payments');
+    const [run] = await tx
+      .select()
+      .from(payrollRuns)
+      .where(and(eq(payrollRuns.id, input.runId), eq(payrollRuns.shopId, actor.shopId)))
+      .for('update');
+    if (!run) throw new DomainError('Payroll not found');
+    if (run.statutoryDueCents <= 0) throw new DomainError('Nothing statutory is due for this payroll');
+    if (run.remittedAt) throw new DomainError('These deductions were already paid over');
+    const entry = await insertEntry(tx, actor, {
+      kind: 'expense',
+      businessDate: todayBusinessDate(),
+      amountCents: run.statutoryDueCents,
+      paymentMethod: input.paymentMethod,
+      expenseCategory: 'statutory',
+      note: `NSSF, SHIF, housing levy and PAYE for ${run.month}`,
+      idempotencyKey: `remit:${run.id}`,
+    });
+    const [updated] = await tx
+      .update(payrollRuns)
+      .set({ remittedAt: sql`now()`, remittanceEntryId: entry.id })
+      .where(and(eq(payrollRuns.id, run.id), eq(payrollRuns.shopId, actor.shopId)))
+      .returning();
+    await audit(tx, actor, 'payroll.remit', 'payroll_run', run.id, { amountCents: run.statutoryDueCents });
+    return updated;
   });
 }

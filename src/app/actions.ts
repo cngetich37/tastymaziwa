@@ -25,6 +25,7 @@ import {
   employeeActiveSchema,
   employeeSchema,
   postPayrollSchema,
+  remitStatutorySchema,
   updateEmployeeSchema,
   budgetsSchema,
   paySuppliersSchema,
@@ -182,6 +183,11 @@ export const giveAdvanceAction = defineAction({ schema: advanceSchema, roles: OW
 
 export const postPayrollAction = defineAction({ schema: postPayrollSchema, roles: OWNER }, ({ db, actor }, input) =>
   ledger.postPayroll(db, actor, input).then((r) => ({ id: r.id, netCents: r.netCents })),
+);
+
+export const remitStatutoryAction = defineAction(
+  { schema: remitStatutorySchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.remitStatutory(db, actor, input).then(idOnly),
 );
 
 // --- shift close -------------------------------------------------------------------
