@@ -31,7 +31,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const entryData = {
     isOwner,
     salePriceCents: shop?.salePricePerLitreCents ?? null,
-    customers: customers.map((c) => ({ id: c.id, name: c.name, balanceCents: c.balanceCents })),
+    customers: customers.map((c) => ({
+      id: c.id,
+      name: c.name,
+      balanceCents: c.balanceCents,
+      creditLimitCents: c.creditLimitCents,
+    })),
     suppliers: suppliers.map((s) => ({
       id: s.id,
       name: s.name,

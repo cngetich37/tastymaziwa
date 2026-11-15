@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, HandCoins, NotebookPen } from 'lucide-react';
+import { ArrowLeft, FileText, HandCoins, NotebookPen } from 'lucide-react';
 import { z } from 'zod';
 import { AddSubscriptionButton, EditCustomerButton } from '@/components/dialog-buttons';
 import { PageHeader } from '@/components/page-header';
@@ -62,8 +62,19 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               }
             />
             <EditCustomerButton
-              customer={{ id: customer.id, name: customer.name, phone: customer.phone, address: customer.address }}
+              customer={{
+                id: customer.id,
+                name: customer.name,
+                phone: customer.phone,
+                address: customer.address,
+                creditLimitCents: customer.creditLimitCents,
+              }}
             />
+            <Button asChild variant="outline" className="h-11 gap-2">
+              <Link href={`/customers/${customer.id}/statement`}>
+                <FileText className="size-4" aria-hidden /> Statement
+              </Link>
+            </Button>
           </>
         }
       />
@@ -81,6 +92,14 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               >
                 {formatKES(Math.abs(customer.balanceCents))}
               </CardTitle>
+              {customer.creditLimitCents != null && (
+                <CardDescription>
+                  Credit limit {formatKES(customer.creditLimitCents)}
+                  {customer.balanceCents > customer.creditLimitCents && (
+                    <span className="text-red-600 dark:text-red-400"> · over the limit</span>
+                  )}
+                </CardDescription>
+              )}
             </CardHeader>
             {unpaid.length > 0 && (
               <CardContent>

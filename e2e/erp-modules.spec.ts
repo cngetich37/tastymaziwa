@@ -43,3 +43,31 @@ test('the shift is counted blind, then the owner signs it off', async ({ page })
   await expect(page.getByText('Shift signed off').first()).toBeVisible();
   await expect(page.getByText('Every close is signed off.')).toBeVisible();
 });
+
+test('owner settles suppliers in one run, reads a statement and sets a budget', async ({ page }) => {
+  await signInWithPassword(page, E2E_OWNER.email, E2E_OWNER.password);
+  // Owe the milkman something first.
+  await page.getByRole('button', { name: 'Delivery in' }).click();
+  await page.getByLabel('Litres received').fill('10');
+  await page.getByRole('button', { name: 'Record delivery' }).click();
+  await expect(page.getByText('Delivery recorded').first()).toBeVisible();
+
+  await page.goto('/suppliers/pay');
+  const pay = page.getByRole('button', { name: /^Pay Ksh/ });
+  await expect(pay).toBeEnabled();
+  await pay.click();
+  await expect(page.getByRole('status').filter({ hasText: /Paid \d+ supplier/ }).first()).toBeVisible();
+
+  await page.goto('/suppliers');
+  await page.getByRole('link', { name: /Milkman/ }).first().click();
+  await page.getByRole('link', { name: 'Statement' }).click();
+  await expect(page.getByRole('heading', { name: 'Statement' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Statement totals' })).toContainText('Paid');
+
+  await page.goto('/expenses');
+  await page.getByRole('button', { name: 'Budgets' }).click();
+  await formReady(page, 'Save budgets');
+  await page.getByLabel('Transport').fill('1000');
+  await page.getByRole('button', { name: 'Save budgets' }).click();
+  await expect(page.getByText('Budgets saved').first()).toBeVisible();
+});

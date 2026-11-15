@@ -20,6 +20,8 @@ import {
   inviteSupplierSchema,
   archiveProductSchema,
   reviewShiftCloseSchema,
+  budgetsSchema,
+  paySuppliersSchema,
   shiftCloseSchema,
   productSchema,
   updateProductSchema,
@@ -136,6 +138,16 @@ export const setSubscriptionStatusAction = defineAction(
   { schema: subscriptionStatusSchema, roles: OWNER },
   ({ db, actor }, input) =>
     ledger.setSubscriptionStatus(db, actor, input.subscriptionId, input.status).then(idOnly),
+);
+
+// --- finance (owner) ----------------------------------------------------------------
+
+export const paySuppliersAction = defineAction({ schema: paySuppliersSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.paySuppliers(db, actor, input),
+);
+
+export const setBudgetsAction = defineAction({ schema: budgetsSchema, roles: OWNER }, ({ db, actor }, input) =>
+  ledger.setBudgets(db, actor, input).then(() => null),
 );
 
 // --- shift close -------------------------------------------------------------------

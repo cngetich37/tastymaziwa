@@ -9,6 +9,8 @@ import {
   createSubscriptionAction,
   createSupplierAction,
   inviteStaffAction,
+  paySuppliersAction,
+  setBudgetsAction,
   submitShiftCloseAction,
   inviteSupplierAction,
   recordCustomerPaymentAction,
@@ -39,6 +41,8 @@ import {
   productSchema,
   reviewDeliverySchema,
   salePriceSchema,
+  budgetsSchema,
+  paySuppliersSchema,
   shiftCloseSchema,
   saleSchema,
   spoilageSchema,
@@ -57,6 +61,8 @@ export interface CustomerOption {
   id: string;
   name: string;
   balanceCents: number;
+  /** Null = no limit. */
+  creditLimitCents?: number | null;
 }
 
 export interface SupplierOption {
@@ -145,6 +151,16 @@ function parsePrice(value: unknown): number | null {
   } catch {
     return null;
   }
+}
+
+/** "Jane will owe Ksh 450" plus a warning when it passes their limit. */
+function creditDetail(customer: CustomerOption, totalCents: number, isOwner: boolean): string {
+  const after = customer.balanceCents + totalCents;
+  const limit = customer.creditLimitCents;
+  if (limit != null && after > limit) {
+    return `${customer.name} would owe ${formatKES(after)}, over the ${formatKES(limit)} limit${isOwner ? '' : ': ask the owner'}`;
+  }
+  return `${customer.name} will owe ${formatKES(after)}${limit != null ? ` of ${formatKES(limit)}` : ''}`;
 }
 
 function TotalLine({ cents, detail }: { cents: number | null; detail?: string | null }) {
@@ -303,7 +319,7 @@ export function SaleForm({
         )}
         <TotalLine
           cents={total}
-          detail={customer && total != null ? `${customer.name} will owe ${formatKES(customer.balanceCents + total)}` : null}
+          detail={customer && total != null ? creditDetail(customer, total, canEditPrice) : null}
         />
         <SubmitButton pending={pending}>Record sale</SubmitButton>
       </form>
@@ -419,6 +435,88 @@ export function DeliveryForm({
           )
         )}
         <SubmitButton pending={pending}>Record delivery</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+// --- finance ----------------------------------------------------------------------
+
+export interface PayableSupplier {
+  id: string;
+  name: string;
+  payableCents: number;
+}
+
+/**
+ * Settle several suppliers at once. Each line starts at the full amount owed;
+ * clear a line to skip that supplier. `runKey` makes the run safe to retry.
+ */
+export function PaySuppliersForm({
+  suppliers,
+  runKey,
+  onDone,
+}: {
+  suppliers: PayableSupplier[];
+  runKey: string;
+  onDone: (r: { paid: number; totalCents: number }) => void;
+}) {
+  const { form, onSubmit, pending } = useActionForm(
+    paySuppliersSchema,
+    paySuppliersAction,
+    {
+      runKey,
+      paymentMethod: 'mpesa',
+      lines: suppliers.map((s) => ({ supplierId: s.id, amount: centsToKesString(s.payableCents) })),
+    },
+    {
+      success: (r) =>
+        r.paid === 0 ? 'This run was already paid' : `Paid ${r.paid} supplier${r.paid === 1 ? '' : 's'} ${formatKES(r.totalCents)}`,
+      onSuccess: onDone,
+    },
+  );
+  const lines = form.watch('lines');
+  const total = lines.reduce((n, l) => n + (parsePrice(l.amount) ?? 0), 0);
+  const linesError = form.formState.errors.lines?.message ?? form.formState.errors.lines?.root?.message;
+
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <ul className="grid gap-3">
+          {suppliers.map((s, i) => (
+            <li key={s.id} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_12rem] sm:items-end">
+              <div>
+                <p className="font-semibold">{s.name}</p>
+                <p className="text-sm text-muted-foreground">Owed {formatKES(s.payableCents)}</p>
+              </div>
+              <TextField name={`lines.${i}.amount`} label={`Pay ${s.name}`} kind="money" />
+            </li>
+          ))}
+        </ul>
+        {linesError && <p className="text-sm text-red-600 dark:text-red-400">{linesError}</p>}
+        <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
+        <TotalLine cents={total} detail="Clear an amount to skip that supplier." />
+        <SubmitButton pending={pending}>Pay {formatKES(total)}</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
+/** One monthly budget per expense category; leave blank for none. */
+export function BudgetsForm({ budgets, onDone }: FormProps & { budgets: Record<string, number | null> }) {
+  const { form, onSubmit, pending } = useActionForm(
+    budgetsSchema,
+    setBudgetsAction,
+    { budgets: EXPENSE_CATEGORIES.map((c) => ({ category: c, monthly: priceString(budgets[c]) })) },
+    { success: 'Budgets saved', onSuccess: onDone, keepValues: true },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-4" noValidate>
+        {EXPENSE_CATEGORIES.map((c, i) => (
+          <TextField key={c} name={`budgets.${i}.monthly`} label={titleCase(c)} kind="money" />
+        ))}
+        <SubmitButton pending={pending}>Save budgets</SubmitButton>
       </form>
     </Form>
   );
@@ -772,13 +870,14 @@ export interface CustomerDetails {
   name: string;
   phone: string | null;
   address: string | null;
+  creditLimitCents: number | null;
 }
 
 export function CustomerForm({ onDone }: FormProps) {
   const { form, onSubmit, pending } = useActionForm(
     customerSchema,
     createCustomerAction,
-    { name: '', phone: '', address: '' },
+    { name: '', phone: '', address: '', creditLimit: '' },
     { success: 'Customer added', onSuccess: onDone },
   );
   return (
@@ -787,6 +886,12 @@ export function CustomerForm({ onDone }: FormProps) {
         <TextField name="name" label="Name" autoFocus />
         <TextField name="phone" label="Phone (optional)" kind="tel" placeholder="0712 345 678" />
         <TextField name="address" label="Location (optional)" />
+        <TextField
+          name="creditLimit"
+          label="Credit limit (optional)"
+          kind="money"
+          description="Sellers can't sell on credit past this. Leave blank for no limit."
+        />
         <SubmitButton pending={pending}>Add customer</SubmitButton>
       </form>
     </Form>
@@ -797,7 +902,13 @@ export function EditCustomerForm({ customer, onDone }: FormProps & { customer: C
   const { form, onSubmit, pending } = useActionForm(
     updateCustomerSchema,
     updateCustomerAction,
-    { customerId: customer.id, name: customer.name, phone: customer.phone ?? '', address: customer.address ?? '' },
+    {
+      customerId: customer.id,
+      name: customer.name,
+      phone: customer.phone ?? '',
+      address: customer.address ?? '',
+      creditLimit: priceString(customer.creditLimitCents),
+    },
     { success: 'Customer updated', onSuccess: onDone, keepValues: true },
   );
   return (
@@ -806,6 +917,12 @@ export function EditCustomerForm({ customer, onDone }: FormProps & { customer: C
         <TextField name="name" label="Name" />
         <TextField name="phone" label="Phone (optional)" kind="tel" placeholder="0712 345 678" />
         <TextField name="address" label="Location (optional)" />
+        <TextField
+          name="creditLimit"
+          label="Credit limit (optional)"
+          kind="money"
+          description="Sellers can't sell on credit past this. Leave blank for no limit."
+        />
         <SubmitButton pending={pending}>Save changes</SubmitButton>
       </form>
     </Form>

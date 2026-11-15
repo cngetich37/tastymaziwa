@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Plus, Wallet } from 'lucide-react';
+import { ArrowLeft, FileText, Plus, Wallet } from 'lucide-react';
 import { z } from 'zod';
 import { EditSupplierButton, InviteSupplierButton } from '@/components/dialog-buttons';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +55,11 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
                 </Button>
               }
             />
+            <Button asChild variant="outline" className="h-11 gap-2">
+              <Link href={`/suppliers/${supplier.id}/statement`}>
+                <FileText className="size-4" aria-hidden /> Statement
+              </Link>
+            </Button>
             <EditSupplierButton
               supplier={{
                 id: supplier.id,

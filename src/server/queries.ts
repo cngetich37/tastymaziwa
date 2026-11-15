@@ -11,6 +11,7 @@ import type { DB } from '@/db/client';
 import {
   customers,
   deliverySubmissions,
+  expenseBudgets,
   ledgerEntries,
   products,
   shiftCloses,
@@ -21,7 +22,7 @@ import {
   type ProductUnit,
 } from '@/db/schema';
 import { allocatePayments, type AllocatedCreditSale } from '@/lib/calc/allocation';
-import { withRunningBalance } from '@/lib/calc/statement';
+import { statementForPeriod, withRunningBalance } from '@/lib/calc/statement';
 import {
   customerBalanceCents,
   dailySeries,
@@ -136,6 +137,9 @@ export interface EntryFilter {
   kinds?: LedgerListItem['kind'][];
   /** Only one business day. */
   date?: BusinessDate;
+  /** Or a range of business days (inclusive). */
+  from?: BusinessDate;
+  to?: BusinessDate;
   customerId?: string;
   supplierId?: string;
   /** Oldest first (statements); newest first by default. */
@@ -145,7 +149,7 @@ export interface EntryFilter {
 export async function listEntries(
   db: DB,
   shopId: string,
-  { limit = 50, offset = 0, kinds, date, customerId, supplierId, oldestFirst = false }: EntryFilter = {},
+  { limit = 50, offset = 0, kinds, date, from, to, customerId, supplierId, oldestFirst = false }: EntryFilter = {},
 ): Promise<LedgerListItem[]> {
   const reversal = alias(ledgerEntries, 'reversal');
   return db
@@ -179,6 +183,8 @@ export async function listEntries(
         eq(ledgerEntries.shopId, shopId),
         kinds?.length ? inArray(ledgerEntries.kind, kinds) : undefined,
         date ? eq(ledgerEntries.businessDate, date) : undefined,
+        from ? gte(ledgerEntries.businessDate, from) : undefined,
+        to ? lte(ledgerEntries.businessDate, to) : undefined,
         customerId ? eq(ledgerEntries.customerId, customerId) : undefined,
         supplierId ? eq(ledgerEntries.supplierId, supplierId) : undefined,
       ),
@@ -200,6 +206,7 @@ export interface CustomerWithBalance {
   phone: string | null;
   address: string | null;
   balanceCents: number;
+  creditLimitCents: number | null;
   subscription: { id: string; dailyMl: number; pricePerLitreCents: number; status: string } | null;
 }
 
@@ -237,6 +244,7 @@ export async function listCustomers(db: DB, shopId: string): Promise<CustomerWit
       phone: c.phone,
       address: c.address,
       balanceCents: customerBalanceCents(byCustomer.get(c.id) ?? []),
+      creditLimitCents: c.creditLimitCents,
       subscription: sub
         ? {
             id: sub.id,
@@ -688,6 +696,45 @@ export async function listShiftCloses(
 }
 
 export type ShiftCloseItem = Awaited<ReturnType<typeof listShiftCloses>>[number];
+
+// --- finance ----------------------------------------------------------------------
+
+/** A statement for one period: balance brought forward, the lines, balance carried out. */
+export async function getPeriodStatement(
+  db: DB,
+  shopId: string,
+  party: { customerId: string } | { supplierId: string },
+  from: BusinessDate,
+  to: BusinessDate,
+) {
+  const kinds: LedgerListItem['kind'][] =
+    'customerId' in party ? ['sale', 'customer_payment'] : ['delivery', 'supplier_payment'];
+  const rows = await listEntries(db, shopId, { ...party, kinds, oldestFirst: true, limit: 100_000 });
+  return statementForPeriod(withRunningBalance(rows, 'customerId' in party ? 'customer' : 'supplier'), from, to);
+}
+
+/** Spending per expense category in a period, with each category's monthly budget. */
+export async function getExpenseBreakdown(db: DB, shopId: string, from: BusinessDate, to: BusinessDate) {
+  const [spent, budgets] = await Promise.all([
+    db
+      .select({ category: ledgerEntries.expenseCategory, amountCents: sumAmount })
+      .from(ledgerEntries)
+      .where(
+        and(
+          eq(ledgerEntries.shopId, shopId),
+          eq(ledgerEntries.kind, 'expense'),
+          gte(ledgerEntries.businessDate, from),
+          lte(ledgerEntries.businessDate, to),
+        ),
+      )
+      .groupBy(ledgerEntries.expenseCategory),
+    db.select().from(expenseBudgets).where(eq(expenseBudgets.shopId, shopId)),
+  ]);
+  return {
+    spent: new Map(spent.map((s) => [s.category ?? 'other', s.amountCents])),
+    budgets: new Map(budgets.map((b) => [b.category, b.monthlyCents])),
+  };
+}
 
 // --- shop ---------------------------------------------------------------------
 

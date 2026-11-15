@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
+import { RangePicker, chipClass } from '@/components/range-picker';
 import { DownloadCsvButton, PrintButton } from '@/components/report-actions';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDb } from '@/db';
-import { RANGE_PRESETS, resolveRange, type Cell, type ColumnType, type ReportTable } from '@/lib/calc/reports';
+import { resolveRange, type Cell, type ColumnType, type ReportTable } from '@/lib/calc/reports';
 import { formatLongDate, formatShortDate, todayBusinessDate } from '@/lib/dates';
 import { formatKES, formatLitres } from '@/lib/money';
 import { OWNER } from '@/lib/roles';
@@ -17,12 +17,6 @@ import { requireUser } from '@/server/session';
 export const metadata = { title: 'Reports · TastyMaziwa' };
 
 type Search = { type?: string; range?: string; from?: string; to?: string };
-
-const chipClass = (active: boolean) =>
-  cn(
-    'inline-flex h-11 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap transition-colors',
-    active ? 'border-primary bg-primary/10 text-primary' : 'border-input bg-background hover:bg-muted',
-  );
 
 function format(value: Cell, type: ColumnType): string {
   if (value == null) return '—';
@@ -163,49 +157,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </ul>
       </nav>
 
-      {report.usesRange && (
-        <section aria-label="Choose a period" className="grid gap-3 rounded-xl border bg-card p-4 print:hidden">
-          <ul className="flex flex-wrap gap-2">
-            {RANGE_PRESETS.map((p) => (
-              <li key={p.value}>
-                <Link
-                  href={href({ type, range: p.value })}
-                  aria-current={range.preset === p.value ? 'true' : undefined}
-                  className={chipClass(range.preset === p.value)}
-                >
-                  {p.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <form method="get" action="/reports" className="flex flex-wrap items-end gap-3">
-            <input type="hidden" name="type" value={type} />
-            <label className="grid min-w-0 flex-1 gap-1 text-sm font-medium">
-              From
-              <input
-                type="date"
-                name="from"
-                defaultValue={range.from}
-                max={today}
-                className="h-11 rounded-md border border-input bg-background px-3 text-base"
-              />
-            </label>
-            <label className="grid min-w-0 flex-1 gap-1 text-sm font-medium">
-              To
-              <input
-                type="date"
-                name="to"
-                defaultValue={range.to}
-                max={today}
-                className="h-11 rounded-md border border-input bg-background px-3 text-base"
-              />
-            </label>
-            <Button type="submit" className="h-11 w-full sm:w-auto">
-              Show
-            </Button>
-          </form>
-        </section>
-      )}
+      {report.usesRange && <RangePicker basePath="/reports" range={range} today={today} keep={{ type }} />}
 
       <p className="-mb-2 text-sm text-muted-foreground">{report.description}</p>
 

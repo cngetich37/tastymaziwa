@@ -60,8 +60,9 @@ Mark each item done with `[x]` as it ships.
 
 ### Credit (*deni*) management
 - [x] **Customer ledger page.** Shows every purchase and payment and the running balance (`/customers/[id]`).
-- [ ] Shareable customer statement (link or PDF).
-- [ ] **Credit limits per customer.** Warn or block when a new credit sale would go over the limit.
+- [x] **Statements for any period** (`/customers/[id]/statement`, `/suppliers/[id]/statement`): balance brought forward, lines with running balance, balance due; print / save as PDF, and "Send on WhatsApp" for customers.
+- [ ] Tokenised statement link a customer can open without logging in.
+- [x] **Credit limits per customer.** The sale form warns; the service blocks a seller's credit sale past the limit (owners may override).
 - [x] **Ageing report** with buckets for current, 1–7, 8–30 and 30+ days (Reports → Debtors).
 - [ ] "Top debtors" card on the dashboard.
 - [ ] **Automated reminders** by SMS (Africa's Talking) or WhatsApp (Business API with approved templates). Example: *"Habari Jane, salio lako TastyMaziwa ni KSh 850. Lipa kwa Till 123456."* The reminder includes a link that triggers STK Push.
@@ -70,7 +71,8 @@ Mark each item done with `[x]` as it ships.
 ### Supplier (milkman) side
 - [x] **Supplier accounts.** Support several milkmen, each with deliveries, the price per litre, and payments made. Show the running payable. (`/suppliers/[id]`)
 - [ ] **Delivery quality notes**, such as rejected litres or a failed lactometer reading, which reduce what is owed.
-- [ ] **Supplier statement** exportable as PDF to settle the weekly or monthly account.
+- [x] **Supplier statement** for any period, printable / PDF.
+- [x] **Supplier payment runs** (`/suppliers/pay`): pay everyone owed in one go; idempotent per run.
 
 ### Products and inventory
 - [x] **Products besides milk** (mala, yoghurt, ghee, packets): unit (piece / litre / kg), selling and buying price, reorder level. `ledger_entries.product_id` (null = fresh milk). Money totals include every product; litres and milk stock stay milk-only.
@@ -88,7 +90,8 @@ Mark each item done with `[x]` as it ships.
 - [ ] **Delivery route list.** A printable or phone-friendly list of today's subscription deliveries, with tick-off as each one is delivered.
 
 ### Expenses and reporting
-- [ ] **Expense tracking** with categories (transport, packaging, electricity/refrigeration, rent, wages) and receipt photos.
+- [x] **Expense tracking and budgets** (`/expenses`): spending per category per month against a monthly budget, with over-budget flags.
+- [ ] Receipt photos on expenses.
 - [x] **P&L report** for any date range: revenue, cost of milk, expenses, gross and net profit, per day, with CSV and print/PDF export. (Spoilage is shown in litres; costing it is still to do.)
 - [x] **Margin per litre** for any period (Reports → Profit & loss). A chart over time is still to do.
 

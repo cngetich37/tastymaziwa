@@ -5,10 +5,12 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   Milk,
+  Receipt,
   Settings,
   ShoppingCart,
   Truck,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@/db/schema';
@@ -40,6 +42,8 @@ export const DELIVERIES: NavItem = { href: '/deliveries', label: 'Deliveries', i
 export const CLOSE: NavItem = { href: '/close', label: 'Close shift', icon: ClipboardCheck, roles: STAFF };
 export const CUSTOMERS: NavItem = { href: '/customers', label: 'Customers', icon: Users };
 export const SUPPLIERS: NavItem = { href: '/suppliers', label: 'Suppliers', icon: Milk };
+export const PAY_SUPPLIERS: NavItem = { href: '/suppliers/pay', label: 'Pay suppliers', icon: Wallet };
+export const EXPENSES: NavItem = { href: '/expenses', label: 'Expenses', icon: Receipt };
 export const INVENTORY: NavItem = { href: '/inventory', label: 'Stock & products', icon: Boxes };
 export const LEDGER: NavItem = { href: '/ledger', label: 'Ledger', icon: BookOpen };
 export const REPORTS: NavItem = { href: '/reports', label: 'Reports', icon: ChartColumn };
@@ -52,9 +56,9 @@ export const SETTINGS: NavItem = { href: '/settings', label: 'Settings', icon: S
 const MODULES: NavGroup[] = [
   { id: 'home', label: 'Counter', icon: LayoutDashboard, items: [TODAY, CLOSE] },
   { id: 'sales', label: 'Sales', icon: ShoppingCart, items: [SALES, CUSTOMERS] },
-  { id: 'purchasing', label: 'Purchasing', icon: Truck, items: [DELIVERIES, SUPPLIERS] },
+  { id: 'purchasing', label: 'Purchasing', icon: Truck, items: [DELIVERIES, SUPPLIERS, PAY_SUPPLIERS] },
   { id: 'inventory', label: 'Inventory', icon: Boxes, items: [INVENTORY] },
-  { id: 'finance', label: 'Finance', icon: BookOpen, items: [LEDGER] },
+  { id: 'finance', label: 'Finance', icon: BookOpen, items: [EXPENSES, LEDGER] },
   { id: 'insights', label: 'Insights', icon: ChartColumn, items: [REPORTS, SETTINGS] },
 ];
 

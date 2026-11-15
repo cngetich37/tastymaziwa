@@ -116,6 +116,8 @@ export const customers = pgTable(
     /** E.164, e.g. +254712345678 */
     phone: text('phone'),
     address: text('address'),
+    /** Most they may owe. A sale that would go over it needs the owner. Null = no limit. */
+    creditLimitCents: cents('credit_limit_cents'),
     createdAt: createdAt(),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
   },
@@ -379,6 +381,22 @@ export const shiftCloses = pgTable(
       'shift_closes_review_consistent',
       sql`(${t.status} = 'submitted') = (${t.reviewedAt} is null)`,
     ),
+  ],
+);
+
+/** A monthly spending limit per expense category (Finance → Expenses). */
+export const expenseBudgets = pgTable(
+  'expense_budgets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    category: text('category').notNull(),
+    monthlyCents: cents('monthly_cents').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('expense_budgets_shop_category_unique').on(t.shopId, t.category),
+    check('expense_budgets_non_negative', sql`${t.monthlyCents} >= 0`),
   ],
 );
 

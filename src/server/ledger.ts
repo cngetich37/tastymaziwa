@@ -9,6 +9,7 @@ import {
   auditLog,
   customers,
   deliverySubmissions,
+  expenseBudgets,
   ledgerEntries,
   products,
   shiftCloses,
@@ -22,10 +23,13 @@ import {
 } from '@/db/schema';
 import { addDays, todayBusinessDate, type BusinessDate } from '@/lib/dates';
 import { expectedTakings } from '@/lib/calc/close';
-import { lineTotalCents } from '@/lib/money';
+import { overCreditLimit } from '@/lib/calc/finance';
+import { formatKES, lineTotalCents } from '@/lib/money';
 import type {
   CustomerInput,
+  BudgetsInput,
   CustomerPaymentInput,
+  PaySuppliersInput,
   ProductInput,
   ReviewShiftCloseInput,
   ShiftCloseInput,
@@ -122,11 +126,31 @@ async function insertEntry(tx: Tx, actor: Actor, values: Omit<NewLedgerEntry, 's
 
 async function assertCustomer(tx: Tx, actor: Actor, customerId: string) {
   const [row] = await tx
-    .select({ id: customers.id, archivedAt: customers.archivedAt })
+    .select({
+      id: customers.id,
+      name: customers.name,
+      creditLimitCents: customers.creditLimitCents,
+      archivedAt: customers.archivedAt,
+    })
     .from(customers)
     .where(and(eq(customers.id, customerId), eq(customers.shopId, actor.shopId)));
   if (!row) throw new DomainError('Customer not found');
   if (row.archivedAt) throw new DomainError('That customer has been archived');
+  return row;
+}
+
+/** What a customer owes now: credit sales minus payments (reversals net out). */
+async function customerBalance(tx: Tx, actor: Actor, customerId: string): Promise<number> {
+  const [row] = await tx
+    .select({
+      cents: sql<number>`coalesce(sum(case
+        when ${ledgerEntries.kind} = 'sale' and ${ledgerEntries.paymentMethod} = 'credit' then ${ledgerEntries.amountCents}
+        when ${ledgerEntries.kind} = 'customer_payment' then -${ledgerEntries.amountCents}
+        else 0 end), 0)`.mapWith(Number),
+    })
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.shopId, actor.shopId), eq(ledgerEntries.customerId, customerId)));
+  return row?.cents ?? 0;
 }
 
 async function assertSupplier(tx: Tx, actor: Actor, supplierId: string) {
@@ -180,7 +204,7 @@ function resolvePrice(
 export function recordSale(db: DB, actor: Actor, input: SaleInput) {
   return db.transaction(async (tx) => {
     const businessDate = entryDateFor(actor, input.date);
-    if (input.customerId) await assertCustomer(tx, actor, input.customerId);
+    const customer = input.customerId ? await assertCustomer(tx, actor, input.customerId) : null;
     const product = input.productId ? await assertProduct(tx, actor, input.productId) : null;
     const price = product
       ? resolvePrice(actor, input.pricePerLitre, product.salePriceCents, {
@@ -192,13 +216,22 @@ export function recordSale(db: DB, actor: Actor, input: SaleInput) {
           staff: 'The owner has not set a selling price yet',
         });
     const isCredit = input.paymentMethod === 'credit';
+    const amountCents = lineTotalCents(input.litres, price);
+    if (isCredit && customer && !isManager(actor)) {
+      const balance = await customerBalance(tx, actor, customer.id);
+      if (overCreditLimit(balance, amountCents, customer.creditLimitCents)) {
+        throw new DomainError(
+          `${customer.name} would owe ${formatKES(balance + amountCents)}, over their limit of ${formatKES(customer.creditLimitCents!)}. Ask the owner.`,
+        );
+      }
+    }
     return insertEntry(tx, actor, {
       kind: 'sale',
       businessDate,
       productId: product?.id ?? null,
       volumeMl: input.litres,
       unitPriceCents: price,
-      amountCents: lineTotalCents(input.litres, price),
+      amountCents,
       paymentMethod: input.paymentMethod,
       customerId: input.customerId ?? null,
       dueDate: isCredit ? (input.dueDate ?? addDays(businessDate, DEFAULT_CREDIT_DAYS)) : null,
@@ -575,6 +608,7 @@ export function createCustomer(db: DB, actor: Actor, input: CustomerInput) {
         name: input.name,
         phone: input.phone ?? null,
         address: input.address ?? null,
+        creditLimitCents: input.creditLimit ?? null,
       })
       .returning();
     await audit(tx, actor, 'customer.create', 'customer', customer.id, input);
@@ -602,7 +636,12 @@ export function updateCustomer(db: DB, actor: Actor, input: UpdateCustomerInput)
   return db.transaction(async (tx) => {
     const [customer] = await tx
       .update(customers)
-      .set({ name: input.name, phone: input.phone ?? null, address: input.address ?? null })
+      .set({
+        name: input.name,
+        phone: input.phone ?? null,
+        address: input.address ?? null,
+        creditLimitCents: input.creditLimit ?? null,
+      })
       .where(and(eq(customers.id, input.customerId), eq(customers.shopId, actor.shopId)))
       .returning();
     if (!customer) throw new DomainError('Customer not found');
@@ -824,5 +863,76 @@ export function reviewShiftClose(db: DB, actor: Actor, input: ReviewShiftCloseIn
       .returning();
     await audit(tx, actor, 'shift.approve', 'shift_close', close.id, { spoilageEntryId, note: input.note });
     return reviewed;
+  });
+}
+
+// --- finance ----------------------------------------------------------------------
+
+/**
+ * Pay several suppliers in one go (e.g. the weekly settlement). One entry per
+ * supplier, all in one transaction. Keys derive from the form's `runKey`, so
+ * a retried or double-tapped run pays nobody twice.
+ */
+export function paySuppliers(db: DB, actor: Actor, input: PaySuppliersInput) {
+  return db.transaction(async (tx) => {
+    if (!isManager(actor)) throw new DomainError('Only the owner pays suppliers');
+    const lines = input.lines.filter((l): l is { supplierId: string; amount: number } => l.amount != null);
+    if (new Set(lines.map((l) => l.supplierId)).size !== lines.length) {
+      throw new DomainError('Each supplier can only appear once in a payment run');
+    }
+    const businessDate = todayBusinessDate();
+    let paid = 0;
+    let totalCents = 0;
+    for (const line of lines) {
+      const supplier = await assertSupplier(tx, actor, line.supplierId);
+      const inserted = await tx
+        .insert(ledgerEntries)
+        .values({
+          shopId: actor.shopId,
+          kind: 'supplier_payment',
+          businessDate,
+          amountCents: line.amount,
+          paymentMethod: input.paymentMethod,
+          supplierId: line.supplierId,
+          note: 'Payment run',
+          idempotencyKey: `payrun:${input.runKey}:${line.supplierId}`,
+          createdBy: actor.id,
+        })
+        .onConflictDoNothing({ target: ledgerEntries.idempotencyKey })
+        .returning({ id: ledgerEntries.id });
+      if (inserted.length === 0) continue;
+      await audit(tx, actor, 'ledger.supplier_payment', 'ledger_entry', inserted[0].id, {
+        amountCents: line.amount,
+        paymentMethod: input.paymentMethod,
+        supplier: supplier.name,
+        runKey: input.runKey,
+      });
+      paid += 1;
+      totalCents += line.amount;
+    }
+    return { paid, totalCents };
+  });
+}
+
+/** Set (or clear, with a blank) each category's monthly budget. */
+export function setBudgets(db: DB, actor: Actor, input: BudgetsInput) {
+  return db.transaction(async (tx) => {
+    if (!isManager(actor)) throw new DomainError('Only the owner sets budgets');
+    for (const b of input.budgets) {
+      if (b.monthly == null) {
+        await tx
+          .delete(expenseBudgets)
+          .where(and(eq(expenseBudgets.shopId, actor.shopId), eq(expenseBudgets.category, b.category)));
+      } else {
+        await tx
+          .insert(expenseBudgets)
+          .values({ shopId: actor.shopId, category: b.category, monthlyCents: b.monthly })
+          .onConflictDoUpdate({
+            target: [expenseBudgets.shopId, expenseBudgets.category],
+            set: { monthlyCents: b.monthly, updatedAt: sql`now()` },
+          });
+      }
+    }
+    await audit(tx, actor, 'budgets.set', 'shop', actor.shopId, input.budgets);
   });
 }

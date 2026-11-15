@@ -57,6 +57,13 @@
       "when": 1794724526543,
       "tag": "0007_shift_closes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794725032386,
+      "tag": "0008_finance",
+      "breakpoints": true
     }
   ]
 }
