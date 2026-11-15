@@ -47,7 +47,7 @@ Mark each item done with `[x]` as it ships.
 - [ ] Notify the seller (push/SMS) when a supplier records a delivery, and the supplier when it is decided.
 - [ ] Scheduled reports by email (e.g. weekly P&L to the owner).
 - [ ] Per-customer prices (e.g. a wholesale rate for hotels and schools).
-- [ ] Shift handover for attendants: cash counted vs. cash expected, signed off by the owner.
+- [x] **Shift close and handover** (`/close`). The seller counts cash, M-Pesa and milk *blind*; the server snapshots expected figures for everything recorded since the previous close (closes are serialised per shop) and stores the variance. The owner signs each close off and can write a milk shortfall off as spoilage in the same step. Expenses now record how they were paid (cash / M-Pesa).
 
 ## P1: Core business features
 
@@ -78,7 +78,7 @@ Mark each item done with `[x]` as it ships.
 - [ ] Stock count adjustments (counted vs expected) per product, beyond milk.
 
 ### Stock and wastage
-- [ ] **Daily close wizard.** Opening stock + deliveries − sales − spoilage = expected closing stock. The attendant enters the actual count, and the app records the variance.
+- [x] **Daily close wizard** (see Shift close above): expected vs counted cash, M-Pesa and milk, with variance.
 - [ ] **Spoilage reasons** (sour, spilled, power outage) with trends over time.
 - [ ] **Low-stock and over-stock alerts** based on typical sales for that weekday.
 

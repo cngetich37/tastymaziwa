@@ -134,6 +134,25 @@ export const deliverySchema = z.object({
   note: optionalText(),
 });
 
+// --- shift close ------------------------------------------------------------------
+
+const countField = (label: string) => scaledField(kesToCents, label, { allowZero: true });
+
+/** The seller's blind count at the end of a shift. */
+export const shiftCloseSchema = z.object({
+  openingFloat: optionalField(countField('Opening float')),
+  countedCash: countField('Cash counted'),
+  countedMpesa: countField('M-Pesa received'),
+  countedMilk: scaledField(litresToMl, 'Milk left', { allowZero: true }),
+  note: optionalText(),
+});
+
+export const reviewShiftCloseSchema = z.object({
+  closeId: id,
+  writeOffShortfall: z.boolean(),
+  note: optionalText(200),
+});
+
 // --- products ------------------------------------------------------------------
 
 export const PRODUCT_UNITS = ['piece', 'litre', 'kg'] as const;
@@ -189,6 +208,8 @@ export const supplierPaymentSchema = z.object({
 export const expenseSchema = z.object({
   category: z.enum(EXPENSE_CATEGORIES),
   amount: kesField(),
+  /** How it was paid: decides whether the shift's cash or M-Pesa goes down. */
+  paymentMethod: optionalField(z.enum(IMMEDIATE_PAYMENT_METHODS)),
   date: entryDate,
   note: optionalText(),
 });
@@ -372,6 +393,8 @@ export type SubscriptionInput = z.output<typeof subscriptionSchema>;
 export type SignupInput = z.output<typeof signupSchema>;
 export type InviteStaffInput = z.output<typeof inviteStaffSchema>;
 export type InviteSupplierInput = z.output<typeof inviteSupplierSchema>;
+export type ShiftCloseInput = z.output<typeof shiftCloseSchema>;
+export type ReviewShiftCloseInput = z.output<typeof reviewShiftCloseSchema>;
 export type ProductInput = z.output<typeof productSchema>;
 export type UpdateProductInput = z.output<typeof updateProductSchema>;
 export type SubmitDeliveryInput = z.output<typeof submitDeliverySchema>;

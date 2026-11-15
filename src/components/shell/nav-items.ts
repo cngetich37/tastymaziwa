@@ -50,7 +50,7 @@ export const SETTINGS: NavItem = { href: '/settings', label: 'Settings', icon: S
  * Pages are added here as modules ship (see docs/ROADMAP.md).
  */
 const MODULES: NavGroup[] = [
-  { id: 'home', label: 'Counter', icon: LayoutDashboard, items: [TODAY] },
+  { id: 'home', label: 'Counter', icon: LayoutDashboard, items: [TODAY, CLOSE] },
   { id: 'sales', label: 'Sales', icon: ShoppingCart, items: [SALES, CUSTOMERS] },
   { id: 'purchasing', label: 'Purchasing', icon: Truck, items: [DELIVERIES, SUPPLIERS] },
   { id: 'inventory', label: 'Inventory', icon: Boxes, items: [INVENTORY] },

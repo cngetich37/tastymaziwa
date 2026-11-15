@@ -9,6 +9,7 @@ import {
   createSubscriptionAction,
   createSupplierAction,
   inviteStaffAction,
+  submitShiftCloseAction,
   inviteSupplierAction,
   recordCustomerPaymentAction,
   recordDeliveryAction,
@@ -38,6 +39,7 @@ import {
   productSchema,
   reviewDeliverySchema,
   salePriceSchema,
+  shiftCloseSchema,
   saleSchema,
   spoilageSchema,
   submitDeliverySchema,
@@ -422,6 +424,49 @@ export function DeliveryForm({
   );
 }
 
+// --- shift close ------------------------------------------------------------------
+
+export interface CloseResult {
+  cashVarianceCents: number;
+  mpesaVarianceCents: number;
+  milkVarianceMl: number;
+}
+
+/**
+ * The seller's blind count: what is in the drawer, on the M-Pesa statement
+ * and in the churn. Expected figures are only revealed after submitting.
+ */
+export function ShiftCloseForm({ onDone }: { onDone?: (r: CloseResult) => void }) {
+  const { form, onSubmit, pending } = useActionForm(
+    shiftCloseSchema,
+    submitShiftCloseAction,
+    { openingFloat: '', countedCash: '', countedMpesa: '', countedMilk: '', note: '' },
+    { success: 'Shift closed', onSuccess: (r) => onDone?.(r) },
+  );
+  return (
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="grid gap-5" noValidate>
+        <TextField
+          name="openingFloat"
+          label="Float at the start (optional)"
+          kind="money"
+          description="Cash that was in the drawer when the shift began."
+        />
+        <TextField name="countedCash" label="Cash in the drawer now" kind="money" />
+        <TextField
+          name="countedMpesa"
+          label="M-Pesa received this shift"
+          kind="money"
+          description="From the till or phone statement."
+        />
+        <TextField name="countedMilk" label="Milk left (litres)" kind="litres" description="Measure what is in the churns." />
+        <TextField name="note" label="Note (optional)" />
+        <SubmitButton pending={pending}>Close shift</SubmitButton>
+      </form>
+    </Form>
+  );
+}
+
 // --- products -------------------------------------------------------------------
 
 export interface ProductDetails {
@@ -703,7 +748,7 @@ export function ExpenseForm({ date, onDone }: FormProps & DatedProps) {
   const { form, onSubmit, pending } = useActionForm(
     expenseSchema,
     recordExpenseAction,
-    { category: 'transport', amount: '', date: date ?? '', note: '' },
+    { category: 'transport', amount: '', paymentMethod: 'cash', date: date ?? '', note: '' },
     { success: 'Expense recorded', onSuccess: onDone },
   );
   return (
@@ -712,6 +757,7 @@ export function ExpenseForm({ date, onDone }: FormProps & DatedProps) {
         <PastDayNotice date={date} />
         <SelectField name="category" label="Category" options={toOptions(EXPENSE_CATEGORIES)} />
         <TextField name="amount" label="Amount" kind="money" />
+        <ChoiceField name="paymentMethod" label="Paid by" options={IMMEDIATE_METHODS} />
         <TextField name="note" label="Note (optional)" />
         <SubmitButton pending={pending}>Record expense</SubmitButton>
       </form>

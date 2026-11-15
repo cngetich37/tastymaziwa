@@ -3,7 +3,7 @@
  * function runs in one DB transaction and writes an audit row alongside the
  * change. Callers (server actions, cron routes, scripts) handle auth.
  */
-import { and, eq, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lte, sql } from 'drizzle-orm';
 import type { DB, Tx } from '@/db/client';
 import {
   auditLog,
@@ -11,6 +11,7 @@ import {
   deliverySubmissions,
   ledgerEntries,
   products,
+  shiftCloses,
   shops,
   subscriptions,
   suppliers,
@@ -20,11 +21,14 @@ import {
   type Role,
 } from '@/db/schema';
 import { addDays, todayBusinessDate, type BusinessDate } from '@/lib/dates';
+import { expectedTakings } from '@/lib/calc/close';
 import { lineTotalCents } from '@/lib/money';
 import type {
   CustomerInput,
   CustomerPaymentInput,
   ProductInput,
+  ReviewShiftCloseInput,
+  ShiftCloseInput,
   UpdateProductInput,
   DeliveryInput,
   ExpenseInput,
@@ -396,6 +400,7 @@ export function recordExpense(db: DB, actor: Actor, input: ExpenseInput) {
       kind: 'expense',
       businessDate: entryDateFor(actor, input.date),
       amountCents: input.amount,
+      paymentMethod: input.paymentMethod ?? 'cash',
       expenseCategory: input.category,
       note: input.note,
     }),
@@ -704,5 +709,120 @@ export function setProductArchived(db: DB, actor: Actor, productId: string, arch
     if (!product) throw new DomainError('Product not found');
     await audit(tx, actor, archived ? 'product.archive' : 'product.restore', 'product', product.id);
     return product;
+  });
+}
+
+// --- shift close ----------------------------------------------------------------
+
+/**
+ * The seller's end-of-shift count. Covers everything recorded since the
+ * previous close (or, for the shop's first close, today). Expected figures
+ * are computed here and stored with the count, so later corrections never
+ * rewrite a closed shift. Closes are serialised per shop by a row lock.
+ */
+export function submitShiftClose(db: DB, actor: Actor, input: ShiftCloseInput) {
+  return db.transaction(async (tx) => {
+    if (actor.role !== 'owner' && actor.role !== 'attendant') throw new DomainError('Only shop staff close a shift');
+    await tx.select({ id: shops.id }).from(shops).where(eq(shops.id, actor.shopId)).for('update');
+    const [last] = await tx
+      .select({ closedAt: shiftCloses.closedAt })
+      .from(shiftCloses)
+      .where(eq(shiftCloses.shopId, actor.shopId))
+      .orderBy(desc(shiftCloses.closedAt))
+      .limit(1);
+    const today = todayBusinessDate();
+    const inWindow = last ? gt(ledgerEntries.createdAt, last.closedAt) : eq(ledgerEntries.businessDate, today);
+    const money = await tx
+      .select({
+        kind: ledgerEntries.kind,
+        paymentMethod: ledgerEntries.paymentMethod,
+        amountCents: sql<number>`coalesce(sum(${ledgerEntries.amountCents}), 0)`.mapWith(Number),
+      })
+      .from(ledgerEntries)
+      .where(and(eq(ledgerEntries.shopId, actor.shopId), inWindow))
+      .groupBy(ledgerEntries.kind, ledgerEntries.paymentMethod);
+    const [milk] = await tx
+      .select({
+        ml: sql<number>`coalesce(sum(case
+          when ${ledgerEntries.kind} = 'delivery' then ${ledgerEntries.volumeMl}
+          when ${ledgerEntries.kind} in ('sale', 'spoilage') then -${ledgerEntries.volumeMl}
+          else 0 end), 0)`.mapWith(Number),
+      })
+      .from(ledgerEntries)
+      .where(and(eq(ledgerEntries.shopId, actor.shopId), isNull(ledgerEntries.productId)));
+    const takings = expectedTakings(money);
+    const openingFloat = input.openingFloat ?? 0;
+
+    const [close] = await tx
+      .insert(shiftCloses)
+      .values({
+        shopId: actor.shopId,
+        businessDate: today,
+        periodStart: last?.closedAt ?? null,
+        closedBy: actor.id!,
+        openingFloatCents: openingFloat,
+        expectedCashCents: openingFloat + takings.cashCents,
+        countedCashCents: input.countedCash,
+        expectedMpesaCents: takings.mpesaCents,
+        countedMpesaCents: input.countedMpesa,
+        expectedMilkMl: milk?.ml ?? 0,
+        countedMilkMl: input.countedMilk,
+        note: input.note ?? null,
+      })
+      .returning();
+    await audit(tx, actor, 'shift.close', 'shift_close', close.id, {
+      expectedCashCents: close.expectedCashCents,
+      countedCashCents: close.countedCashCents,
+      expectedMpesaCents: close.expectedMpesaCents,
+      countedMpesaCents: close.countedMpesaCents,
+      expectedMilkMl: close.expectedMilkMl,
+      countedMilkMl: close.countedMilkMl,
+    });
+    return close;
+  });
+}
+
+/**
+ * The owner signs a close off. If milk came up short they can write the
+ * shortfall off as spoilage in the same step, so stock matches the count.
+ */
+export function reviewShiftClose(db: DB, actor: Actor, input: ReviewShiftCloseInput) {
+  return db.transaction(async (tx) => {
+    if (!isManager(actor)) throw new DomainError('Only the owner signs off a shift close');
+    const [close] = await tx
+      .select()
+      .from(shiftCloses)
+      .where(and(eq(shiftCloses.id, input.closeId), eq(shiftCloses.shopId, actor.shopId)))
+      .for('update');
+    if (!close) throw new DomainError('Shift close not found');
+    if (close.status !== 'submitted') throw new DomainError('This close was already signed off');
+
+    const shortfallMl = close.expectedMilkMl - close.countedMilkMl;
+    let spoilageEntryId: string | null = null;
+    if (input.writeOffShortfall) {
+      if (shortfallMl <= 0) throw new DomainError('There is no milk shortfall to write off');
+      const entry = await insertEntry(tx, actor, {
+        kind: 'spoilage',
+        businessDate: close.businessDate,
+        volumeMl: shortfallMl,
+        expenseCategory: 'other',
+        note: 'Shift close shortfall',
+        idempotencyKey: `close:${close.id}`,
+      });
+      spoilageEntryId = entry.id;
+    }
+    const [reviewed] = await tx
+      .update(shiftCloses)
+      .set({
+        status: 'approved',
+        reviewedBy: actor.id,
+        reviewedAt: sql`now()`,
+        reviewNote: input.note ?? null,
+        spoilageEntryId,
+      })
+      .where(and(eq(shiftCloses.id, close.id), eq(shiftCloses.shopId, actor.shopId)))
+      .returning();
+    await audit(tx, actor, 'shift.approve', 'shift_close', close.id, { spoilageEntryId, note: input.note });
+    return reviewed;
   });
 }

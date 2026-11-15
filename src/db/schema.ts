@@ -329,6 +329,59 @@ export const deliverySubmissions = pgTable(
   ],
 );
 
+export const shiftCloseStatusEnum = pgEnum('shift_close_status', ['submitted', 'approved']);
+
+/**
+ * End-of-shift cash-up. The seller counts cash, M-Pesa and milk "blind"
+ * (without seeing what is expected); the server snapshots the expected
+ * figures for everything recorded since the previous close. The owner then
+ * reviews the variance and may write a milk shortfall off as spoilage.
+ */
+export const shiftCloses = pgTable(
+  'shift_closes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shopId: shopId(),
+    businessDate: date('business_date').notNull(),
+    /** Start of the window: the previous close, or null for the shop's first. */
+    periodStart: timestamp('period_start', { withTimezone: true }),
+    closedAt: timestamp('closed_at', { withTimezone: true }).notNull().defaultNow(),
+    closedBy: uuid('closed_by')
+      .notNull()
+      .references(() => users.id),
+    openingFloatCents: cents('opening_float_cents').notNull().default(0),
+    expectedCashCents: cents('expected_cash_cents').notNull(),
+    countedCashCents: cents('counted_cash_cents').notNull(),
+    expectedMpesaCents: cents('expected_mpesa_cents').notNull(),
+    countedMpesaCents: cents('counted_mpesa_cents').notNull(),
+    expectedMilkMl: millilitres('expected_milk_ml').notNull(),
+    countedMilkMl: millilitres('counted_milk_ml').notNull(),
+    note: text('note'),
+    status: shiftCloseStatusEnum('status').notNull().default('submitted'),
+    reviewedBy: uuid('reviewed_by').references(() => users.id),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewNote: text('review_note'),
+    /** The spoilage entry that wrote off a milk shortfall, if the owner chose to. */
+    spoilageEntryId: uuid('spoilage_entry_id'),
+  },
+  (t) => [
+    index('shift_closes_shop_closed_idx').on(t.shopId, t.closedAt),
+    foreignKey({
+      name: 'shift_closes_spoilage_same_shop_fk',
+      columns: [t.spoilageEntryId, t.shopId],
+      foreignColumns: [ledgerEntries.id, ledgerEntries.shopId],
+    }),
+    check(
+      'shift_closes_counts_non_negative',
+      sql`${t.openingFloatCents} >= 0 and ${t.countedCashCents} >= 0 and ${t.countedMpesaCents} >= 0 and ${t.countedMilkMl} >= 0`,
+    ),
+    check(
+      'shift_closes_review_consistent',
+      sql`(${t.status} = 'submitted') = (${t.reviewedAt} is null)`,
+    ),
+  ],
+);
+
 /** Who did what, when. Written in the same transaction as the change. */
 export const auditLog = pgTable(
   'audit_log',
@@ -392,6 +445,7 @@ export type ProductUnit = (typeof productUnitEnum.enumValues)[number];
 export type Subscription = typeof subscriptions.$inferSelect;
 export type DeliverySubmission = typeof deliverySubmissions.$inferSelect;
 export type DeliverySubmissionStatus = (typeof deliverySubmissionStatusEnum.enumValues)[number];
+export type ShiftClose = typeof shiftCloses.$inferSelect;
 export type LedgerEntry = typeof ledgerEntries.$inferSelect;
 export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
 export type AuthTokenPurpose = (typeof authTokenPurposeEnum.enumValues)[number];

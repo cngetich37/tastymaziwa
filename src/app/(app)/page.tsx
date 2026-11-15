@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Banknote, CheckCircle2, Circle, Droplet, HandCoins, Lock, TrendingUp, Truck } from 'lucide-react';
+import { Banknote, CheckCircle2, Circle, ClipboardCheck, Droplet, HandCoins, Lock, TrendingUp, Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { EntryList } from '@/components/entry-list';
 import { PageHeader } from '@/components/page-header';
 import { PendingDeliveriesCard } from '@/components/pending-deliveries-card';
@@ -12,7 +13,7 @@ import { getDb } from '@/db';
 import { formatLongDate } from '@/lib/dates';
 import { formatKES, formatLitres } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { getDashboard, getShop, listDeliverySubmissions, listEntries, listSuppliers } from '@/server/queries';
+import { getDashboard, getShop, listDeliverySubmissions, listEntries, listShiftCloses, listSuppliers } from '@/server/queries';
 import { requireUser } from '@/server/session';
 
 const salesDetail = (t: { salesMl: number; cashSalesCents: number; mpesaSalesCents: number; creditSalesCents: number }) =>
@@ -71,7 +72,17 @@ export default async function DashboardPage() {
     const recent = await listEntries(db, user.shopId, { kinds: ['sale', 'delivery'], date: dash.today, limit: 20 });
     return (
       <div className="grid grid-cols-1 gap-6">
-        <PageHeader title="Today" description={formatLongDate(dash.today)} />
+        <PageHeader
+          title="Today"
+          description={formatLongDate(dash.today)}
+        actions={
+          <Button asChild variant="outline" className="h-11 gap-2">
+            <Link href="/close">
+              <ClipboardCheck className="size-4" aria-hidden /> Close shift
+            </Link>
+          </Button>
+        }
+      />
         <PendingDeliveriesCard deliveries={pending} today={dash.today} />
         <QuickActions />
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -117,14 +128,40 @@ export default async function DashboardPage() {
     );
   }
 
-  const [recent, suppliers] = await Promise.all([
+  const [recent, suppliers, closesToCheck] = await Promise.all([
     listEntries(db, user.shopId, { limit: 8 }),
     listSuppliers(db, user.shopId),
+    listShiftCloses(db, user.shopId, { status: 'submitted' }),
   ]);
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageHeader title="Today" description={formatLongDate(dash.today)} />
+      <PageHeader
+        title="Today"
+        description={formatLongDate(dash.today)}
+        actions={
+          <Button asChild variant="outline" className="h-11 gap-2">
+            <Link href="/close">
+              <ClipboardCheck className="size-4" aria-hidden /> Close shift
+            </Link>
+          </Button>
+        }
+      />
+
+      {closesToCheck.length > 0 && (
+        <Link
+          href="/close"
+          className="flex min-h-11 items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm hover:bg-amber-500/10"
+        >
+          <ClipboardCheck className="size-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <span>
+            <strong>
+              {closesToCheck.length} shift close{closesToCheck.length === 1 ? '' : 's'}
+            </strong>{' '}
+            to check and sign off
+          </span>
+        </Link>
+      )}
 
       <SetupChecklist
         steps={[

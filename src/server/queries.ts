@@ -13,6 +13,7 @@ import {
   deliverySubmissions,
   ledgerEntries,
   products,
+  shiftCloses,
   shops,
   subscriptions,
   suppliers,
@@ -647,6 +648,46 @@ export async function getProduct(db: DB, shopId: string, productId: string) {
     .where(and(eq(products.id, productId), eq(products.shopId, shopId)));
   return product ?? null;
 }
+
+// --- shift closes ------------------------------------------------------------------
+
+export async function listShiftCloses(
+  db: DB,
+  shopId: string,
+  { status, limit = 30 }: { status?: 'submitted' | 'approved'; limit?: number } = {},
+) {
+  const closer = alias(users, 'closer');
+  const reviewer = alias(users, 'reviewer');
+  return db
+    .select({
+      id: shiftCloses.id,
+      businessDate: shiftCloses.businessDate,
+      periodStart: shiftCloses.periodStart,
+      closedAt: shiftCloses.closedAt,
+      closedByName: closer.name,
+      openingFloatCents: shiftCloses.openingFloatCents,
+      expectedCashCents: shiftCloses.expectedCashCents,
+      countedCashCents: shiftCloses.countedCashCents,
+      expectedMpesaCents: shiftCloses.expectedMpesaCents,
+      countedMpesaCents: shiftCloses.countedMpesaCents,
+      expectedMilkMl: shiftCloses.expectedMilkMl,
+      countedMilkMl: shiftCloses.countedMilkMl,
+      note: shiftCloses.note,
+      status: shiftCloses.status,
+      reviewedByName: reviewer.name,
+      reviewedAt: shiftCloses.reviewedAt,
+      reviewNote: shiftCloses.reviewNote,
+      spoilageEntryId: shiftCloses.spoilageEntryId,
+    })
+    .from(shiftCloses)
+    .innerJoin(closer, eq(closer.id, shiftCloses.closedBy))
+    .leftJoin(reviewer, eq(reviewer.id, shiftCloses.reviewedBy))
+    .where(and(eq(shiftCloses.shopId, shopId), status ? eq(shiftCloses.status, status) : undefined))
+    .orderBy(desc(shiftCloses.closedAt))
+    .limit(limit);
+}
+
+export type ShiftCloseItem = Awaited<ReturnType<typeof listShiftCloses>>[number];
 
 // --- shop ---------------------------------------------------------------------
 

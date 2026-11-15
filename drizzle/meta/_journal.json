@@ -50,6 +50,13 @@
       "when": 1794723828412,
       "tag": "0006_products",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794724526543,
+      "tag": "0007_shift_closes",
+      "breakpoints": true
     }
   ]
 }

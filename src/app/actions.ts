@@ -19,6 +19,8 @@ import {
   inviteStaffSchema,
   inviteSupplierSchema,
   archiveProductSchema,
+  reviewShiftCloseSchema,
+  shiftCloseSchema,
   productSchema,
   updateProductSchema,
   reviewDeliverySchema,
@@ -134,6 +136,25 @@ export const setSubscriptionStatusAction = defineAction(
   { schema: subscriptionStatusSchema, roles: OWNER },
   ({ db, actor }, input) =>
     ledger.setSubscriptionStatus(db, actor, input.subscriptionId, input.status).then(idOnly),
+);
+
+// --- shift close -------------------------------------------------------------------
+
+/** The seller's blind count; the variance is only shown after submitting. */
+export const submitShiftCloseAction = defineAction(
+  { schema: shiftCloseSchema, roles: STAFF },
+  ({ db, actor }, input) =>
+    ledger.submitShiftClose(db, actor, input).then((c) => ({
+      id: c.id,
+      cashVarianceCents: c.countedCashCents - c.expectedCashCents,
+      mpesaVarianceCents: c.countedMpesaCents - c.expectedMpesaCents,
+      milkVarianceMl: c.countedMilkMl - c.expectedMilkMl,
+    })),
+);
+
+export const reviewShiftCloseAction = defineAction(
+  { schema: reviewShiftCloseSchema, roles: OWNER },
+  ({ db, actor }, input) => ledger.reviewShiftClose(db, actor, input).then(idOnly),
 );
 
 // --- products (owner) ------------------------------------------------------------
